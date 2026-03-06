@@ -14,6 +14,10 @@ const searchQuery = ref('')
 const showHistoryFor = ref(null)
 const activeTab = ref('hadir')
 
+// --- Filter Jurusan ---
+const selectedClass = ref('XII RPL 2') // Default filter agar data langsung muncul
+const classOptions = ['XII RPL 1', 'XII RPL 2', 'XII AKL 1', 'XII TJKT 1', 'XII MPLB 3']
+
 // ===== QR GURU =====
 const guruTokenPrefix = 'ABSENSI-GURU-'
 const guruQr = ref('')
@@ -46,12 +50,19 @@ const avatarInitial = computed(() =>
 const filteredStudents = computed(() => {
   let list = students.value
 
+  // 1. Filter Berdasarkan Kelas/Jurusan yang dipilih
+  if (selectedClass.value) {
+    list = list.filter(s => (s.class || 'XII RPL 1') === selectedClass.value)
+  }
+
+  // 2. Filter Berdasarkan Tab Status
   if (activeTab.value === 'hadir') {
     list = list.filter(s => ['hadir', 'izin', 'sakit', 'alfa'].includes(s.status?.toLowerCase()))
   } else if (activeTab.value === 'belum') {
     list = list.filter(s => !s.status)
   }
 
+  // 3. Filter Berdasarkan Search Query
   if (searchQuery.value) {
     const q = searchQuery.value.toLowerCase()
     list = list.filter(s =>
@@ -64,7 +75,7 @@ const filteredStudents = computed(() => {
 })
 
 const hadirCount = computed(() =>
-  students.value.filter(s => ['hadir', 'izin', 'sakit', 'alfa'].includes(s.status?.toLowerCase())).length
+  filteredStudents.value.filter(s => ['hadir', 'izin', 'sakit', 'alfa'].includes(s.status?.toLowerCase())).length
 )
 
 // ================= LOGIC =================
@@ -100,7 +111,6 @@ const loadStudents = async () => {
   }
 }
 
-// ================= UPDATE STATUS MANUAL (FIXED) =================
 const updateStatusManual = async (nis, newStatus) => {
   try {
     await axios.post(`${backendUrl}/students/absensi-manual`, {
@@ -110,8 +120,6 @@ const updateStatusManual = async (nis, newStatus) => {
     })
     
     showToast(`Berhasil update status ke ${newStatus}`)
-    
-    // Refresh data agar UI terupdate otomatis
     await loadStudents() 
   } catch (e) {
     console.error(e)
@@ -146,7 +154,6 @@ const toggleHistory = (nis) => {
 }
 
 onMounted(async () => {
-  // Pastikan JS Bootstrap dimuat agar dropdown jalan
   if (!document.getElementById('bootstrap-js')) {
     const script = document.createElement('script')
     script.id = 'bootstrap-js'
@@ -199,16 +206,23 @@ onUnmounted(() => {
   </nav>
 
   <main class="container py-4" style="max-width: 600px;">
+    <div class="mb-3 px-1">
+      <label class="smaller fw-bold text-muted mb-2 d-block">PILIH JURUSAN / KELAS</label>
+      <select v-model="selectedClass" class="form-select border-0 shadow-sm rounded-3 fw-bold py-2">
+        <option v-for="opt in classOptions" :key="opt" :value="opt">{{ opt }}</option>
+      </select>
+    </div>
+
     <section class="dashboard-hero mb-4 shadow-sm">
       <div class="row align-items-center g-0">
         <div class="col-7 p-4">
-          <h4 class="fw-bold mb-1 text-white">Monitoring</h4>
-          <p class="text-white-50 small mb-0">Kehadiran Siswa Real-time</p>
+          <h4 class="fw-bold mb-1 text-white">{{ selectedClass }}</h4>
+          <p class="text-white-50 small mb-0">Status Kehadiran Hari Ini</p>
         </div>
         <div class="col-5 p-3">
           <div class="stat-card-inner">
             <span class="d-block small text-white-50">TERDATA</span>
-            <h2 class="fw-black m-0 text-white">{{ hadirCount }}<small class="fs-6 opacity-50">/{{ students.length }}</small></h2>
+            <h2 class="fw-black m-0 text-white">{{ hadirCount }}<small class="fs-6 opacity-50">/{{ filteredStudents.length }}</small></h2>
           </div>
         </div>
       </div>
@@ -221,7 +235,7 @@ onUnmounted(() => {
         </div>
         <div class="text-start flex-grow-1">
           <h6 class="fw-bold mb-0">Tampilkan QR Absensi</h6>
-          <small class="text-muted">Siswa melakukan scan melalui ponsel</small>
+          <small class="text-muted">Untuk Kelas {{ selectedClass }}</small>
         </div>
         <i class="bi bi-chevron-right text-muted"></i>
       </div>
@@ -248,7 +262,7 @@ onUnmounted(() => {
                 <div class="student-initial">{{ s.name[0] }}</div>
                 <div>
                   <h6 class="mb-0 fw-bold small">{{ s.name }}</h6>
-                  <small class="text-muted smaller">{{ s.nis }} • {{ s.class || 'XII RPL' }}</small>
+                  <small class="text-muted smaller">{{ s.nis }} • {{ s.class }}</small>
                 </div>
               </div>
               
@@ -294,7 +308,7 @@ onUnmounted(() => {
 
         <div v-if="filteredStudents.length === 0" class="text-center py-5">
           <i class="bi bi-folder2-open display-4 text-muted mb-2"></i>
-          <p class="text-muted small">Data tidak ditemukan</p>
+          <p class="text-muted small">Tidak ada data di kelas {{ selectedClass }}</p>
         </div>
       </div>
     </section>
@@ -310,7 +324,7 @@ onUnmounted(() => {
         <div class="drag-handle mb-4"></div>
         <div class="text-center mb-4">
           <h5 class="fw-bold mb-1">QR Code Presensi</h5>
-          <p class="text-muted small">Berlaku untuk mata pelajaran saat ini</p>
+          <p class="text-muted small">Mata Pelajaran: {{ user.mapel || 'Sesi Guru' }}</p>
         </div>
         
         <div class="qr-display-area shadow-sm">
