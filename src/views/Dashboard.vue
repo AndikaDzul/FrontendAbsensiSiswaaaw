@@ -15,8 +15,17 @@ const showHistoryFor = ref(null)
 const activeTab = ref('hadir')
 
 // --- Filter Jurusan ---
-const selectedClass = ref('XII RPL 2') // Default filter agar data langsung muncul
+const selectedClass = ref('XII RPL 2') 
 const classOptions = ['XII RPL 1', 'XII RPL 2', 'XII AKL 1', 'XII TJKT 1', 'XII MPLB 3']
+
+// ===== AI CAMERA COUNT STATE =====
+const showCameraModal = ref(false)
+const videoRef = ref(null)
+const canvasRef = ref(null)
+const isDetecting = ref(false)
+const aiStudentCount = ref(parseInt(localStorage.getItem('ai_count_' + selectedClass.value)) || 0)
+let detectionInterval = null
+let stream = null
 
 // ===== QR GURU =====
 const guruTokenPrefix = 'ABSENSI-GURU-'
@@ -49,20 +58,14 @@ const avatarInitial = computed(() =>
 
 const filteredStudents = computed(() => {
   let list = students.value
-
-  // 1. Filter Berdasarkan Kelas/Jurusan yang dipilih
   if (selectedClass.value) {
     list = list.filter(s => (s.class || 'XII RPL 1') === selectedClass.value)
   }
-
-  // 2. Filter Berdasarkan Tab Status
   if (activeTab.value === 'hadir') {
     list = list.filter(s => ['hadir', 'izin', 'sakit', 'alfa'].includes(s.status?.toLowerCase()))
   } else if (activeTab.value === 'belum') {
     list = list.filter(s => !s.status)
   }
-
-  // 3. Filter Berdasarkan Search Query
   if (searchQuery.value) {
     const q = searchQuery.value.toLowerCase()
     list = list.filter(s =>
@@ -70,7 +73,6 @@ const filteredStudents = computed(() => {
       s.nis.includes(q)
     )
   }
-
   return list
 })
 
@@ -78,21 +80,69 @@ const hadirCount = computed(() =>
   filteredStudents.value.filter(s => ['hadir', 'izin', 'sakit', 'alfa'].includes(s.status?.toLowerCase())).length
 )
 
+// ================= AI CAMERA LOGIC =================
+const startCamera = async () => {
+  showCameraModal.value = true
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+    if (videoRef.value) {
+      videoRef.value.srcObject = stream
+      initAiDetection()
+    }
+  } catch (err) {
+    showToast('Gagal akses kamera', 'error')
+    showCameraModal.value = false
+  }
+}
+
+const stopCamera = () => {
+  if (stream) {
+    stream.getTracks().forEach(track => track.stop())
+  }
+  if (detectionInterval) clearInterval(detectionInterval)
+  showCameraModal.value = false
+  isDetecting.value = false
+}
+
+const initAiDetection = async () => {
+  isDetecting.value = true
+  if (!window.cocoSsd) {
+    showToast('Loading AI Model...', 'success')
+  }
+  
+  const model = await window.cocoSsd.load()
+  
+  detectionInterval = setInterval(async () => {
+    if (videoRef.value && isDetecting.value) {
+      const predictions = await model.detect(videoRef.value)
+      const persons = predictions.filter(p => p.class === 'person')
+      
+      aiStudentCount.value = persons.length
+      localStorage.setItem('ai_count_' + selectedClass.value, persons.length)
+      
+      const ctx = canvasRef.value.getContext('2d')
+      ctx.clearRect(0, 0, canvasRef.value.width, canvasRef.value.height)
+      persons.forEach(p => {
+        ctx.strokeStyle = '#6366f1'
+        ctx.lineWidth = 4
+        ctx.strokeRect(p.bbox[0], p.bbox[1], p.bbox[2], p.bbox[3])
+      })
+    }
+  }, 1000)
+}
+
 // ================= LOGIC =================
 const loadStudents = async () => {
   try {
     const res = await axios.get(`${backendUrl}/students`)
     const today = new Date().toDateString() 
-
     students.value = res.data.map(s => {
       const todayHistory = (s.attendanceHistory || []).filter(h => {
         if (!h.timestamp) return false
         return new Date(h.timestamp).toDateString() === today
       })
-
       const isPresentToday = todayHistory.length > 0
       const currentStatus = isPresentToday ? todayHistory[todayHistory.length - 1].status : null
-
       return {
         ...s,
         status: currentStatus, 
@@ -116,13 +166,11 @@ const updateStatusManual = async (nis, newStatus) => {
     await axios.post(`${backendUrl}/students/absensi-manual`, {
       nis: nis,
       status: newStatus,
-      teacherName: user.value.name
+      teacherName: user.name
     })
-    
     showToast(`Berhasil update status ke ${newStatus}`)
     await loadStudents() 
   } catch (e) {
-    console.error(e)
     showToast('Gagal update status', 'error')
   }
 }
@@ -131,10 +179,11 @@ const resetAllAttendance = async () => {
   if (!confirm('Bersihkan semua data kehadiran hari ini?')) return
   try {
     await axios.post(`${backendUrl}/students/reset`)
+    localStorage.removeItem('ai_count_' + selectedClass.value)
+    aiStudentCount.value = 0
     showToast('Database kehadiran telah direset')
     await loadStudents()
   } catch (e) {
-    console.error(e)
     showToast('Gagal mereset data', 'error')
   }
 }
@@ -160,6 +209,17 @@ onMounted(async () => {
     script.src = "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"
     document.head.appendChild(script)
   }
+  
+  if (!document.getElementById('tfjs')) {
+    const tf = document.createElement('script')
+    tf.id = 'tfjs'
+    tf.src = "https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"
+    document.head.appendChild(tf)
+    
+    const coco = document.createElement('script')
+    coco.src = "https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"
+    document.head.appendChild(coco)
+  }
 
   user.value.name = localStorage.getItem('teacherName') || 'Guru'
   await loadStudents()
@@ -169,9 +229,9 @@ onMounted(async () => {
 
 onUnmounted(() => {
   if (qrInterval) clearInterval(qrInterval)
+  stopCamera()
 })
 </script>
-
 
 <template>
 <div :class="['app-container', darkMode ? 'dark-theme' : 'light-theme']">
@@ -218,6 +278,11 @@ onUnmounted(() => {
         <div class="col-7 p-4">
           <h4 class="fw-bold mb-1 text-white">{{ selectedClass }}</h4>
           <p class="text-white-50 small mb-0">Status Kehadiran Hari Ini</p>
+          <div v-if="aiStudentCount > 0" class="mt-2">
+            <span class="badge bg-primary-subtle text-primary smaller">
+              <i class="bi bi-cpu-fill me-1"></i> AI Scan: {{ aiStudentCount }} Siswa
+            </span>
+          </div>
         </div>
         <div class="col-5 p-3">
           <div class="stat-card-inner">
@@ -227,6 +292,19 @@ onUnmounted(() => {
         </div>
       </div>
     </section>
+
+    <button @click="startCamera" class="ai-trigger-card mb-3 border-0 shadow-sm w-100 p-3">
+      <div class="d-flex align-items-center gap-3">
+        <div class="ai-icon-box">
+          <i class="bi bi-camera-video-fill text-indigo fs-3"></i>
+        </div>
+        <div class="text-start flex-grow-1">
+          <h6 class="fw-bold mb-0">Hitung Siswa (AI Camera)</h6>
+          <small class="text-muted">Deteksi otomatis jumlah orang di kelas</small>
+        </div>
+        <i class="bi bi-record-circle text-danger blink"></i>
+      </div>
+    </button>
 
     <button @click="showQrModal=true" class="qr-trigger-card mb-4 border-0 shadow-sm w-100 p-3">
       <div class="d-flex align-items-center gap-3">
@@ -294,7 +372,6 @@ onUnmounted(() => {
                 <button @click="toggleHistory(s.nis)" class="btn-detail">
                   {{ showHistoryFor === s.nis ? 'Sembunyikan' : 'Lihat Detail Waktu' }}
                 </button>
-
                 <div v-if="showHistoryFor === s.nis">
                   <div v-for="(h, idx) in s.attendanceHistory" :key="idx" class="text-primary smaller">
                     <i class="bi bi-stopwatch me-1"></i>
@@ -326,24 +403,49 @@ onUnmounted(() => {
           <h5 class="fw-bold mb-1">QR Code Presensi</h5>
           <p class="text-muted small">Mata Pelajaran: {{ user.mapel || 'Sesi Guru' }}</p>
         </div>
-        
         <div class="qr-display-area shadow-sm">
           <img :src="guruQr" class="img-fluid rounded-3" alt="QR Code" />
-          <div class="qr-progress-bar">
-            <div class="bar-fill"></div>
+          <div class="qr-progress-bar"><div class="bar-fill"></div></div>
+        </div>
+        <button @click="showQrModal=false" class="btn btn-dark w-100 rounded-pill py-3 mt-4 fw-bold">Tutup</button>
+      </div>
+    </div>
+  </Transition>
+
+  <Transition name="sheet">
+    <div v-if="showCameraModal" class="sheet-overlay">
+      <div class="sheet-content h-75 position-relative">
+        <button @click="stopCamera" class="btn-close-modal">
+          <i class="bi bi-x-lg"></i>
+        </button>
+
+        <div class="drag-handle mb-4"></div>
+        <div class="text-center mb-3">
+          <h5 class="fw-bold mb-0">AI Student Scanner</h5>
+          <p class="text-muted small">Mendeteksi jumlah siswa secara otomatis</p>
+        </div>
+
+        <div class="camera-container shadow-sm mb-3">
+          <video ref="videoRef" autoplay muted playsinline class="video-preview"></video>
+          <canvas ref="canvasRef" class="canvas-overlay"></canvas>
+          <div class="ai-badge">
+            <div class="pulse-red"></div> LIVE AI
           </div>
         </div>
 
-        <div class="mt-4 p-3 bg-light rounded-3 text-center">
-          <small class="text-muted d-block mb-1">Status Sinyal QR</small>
-          <span class="badge bg-success-subtle text-success border border-success-subtle">
-            <i class="bi bi-broadcast me-1"></i> Terhubung & Aktif
-          </span>
+        <div class="text-center p-3 bg-light rounded-4">
+          <h1 class="fw-black text-indigo mb-0">{{ aiStudentCount }}</h1>
+          <small class="fw-bold text-muted">Siswa Terdeteksi</small>
         </div>
-        
-        <button @click="showQrModal=false" class="btn btn-dark w-100 rounded-pill py-3 mt-4 fw-bold">
-          Selesai / Tutup
-        </button>
+
+        <div class="d-flex gap-2 mt-4">
+          <button @click="stopCamera" class="btn btn-light flex-grow-1 rounded-pill py-3 fw-bold border">
+            Batal
+          </button>
+          <button @click="stopCamera" class="btn btn-dark flex-grow-1 rounded-pill py-3 fw-bold">
+            Simpan Hasil
+          </button>
+        </div>
       </div>
     </div>
   </Transition>
@@ -353,160 +455,88 @@ onUnmounted(() => {
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
 
-.app-container {
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  min-height: 100vh;
-  transition: background 0.3s;
-}
-
+.app-container { font-family: 'Plus Jakarta Sans', sans-serif; min-height: 100vh; transition: background 0.3s; }
 .light-theme { background-color: #f8fafc; color: #1e293b; }
 .dark-theme { background-color: #0f172a; color: #f1f5f9; }
 
-/* NAVBAR */
-.teacher-nav {
-  height: 70px;
-  background: rgba(255,255,255,0.8);
-  backdrop-filter: blur(10px);
-  position: sticky; top: 0; z-index: 100;
-  border-bottom: 1px solid rgba(0,0,0,0.05);
-}
+.teacher-nav { height: 70px; background: rgba(255,255,255,0.8); backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 100; border-bottom: 1px solid rgba(0,0,0,0.05); }
 .dark-theme .teacher-nav { background: rgba(30, 41, 59, 0.8); border-color: rgba(255,255,255,0.05); }
 
-.nav-content-web {
-  max-width: 600px; margin: 0 auto;
-  height: 100%; display: flex; align-items: center; justify-content: space-between;
-}
+.nav-content-web { max-width: 600px; margin: 0 auto; height: 100%; display: flex; align-items: center; justify-content: space-between; }
+.teacher-avatar { width: 40px; height: 40px; border-radius: 12px; background: linear-gradient(135deg, #6366f1, #4338ca); color: white; display: flex; align-items: center; justify-content: center; font-weight: 800; }
 
-.teacher-avatar {
-  width: 40px; height: 40px; border-radius: 12px;
-  background: linear-gradient(135deg, #6366f1, #4338ca);
-  color: white; display: flex; align-items: center; justify-content: center; font-weight: 800;
-}
-
-.icon-btn {
-  width: 38px; height: 38px; border-radius: 50%; border: none;
-  background: #f1f5f9; display: flex; align-items: center; justify-content: center;
-  transition: 0.2s;
-}
+.icon-btn { width: 38px; height: 38px; border-radius: 50%; border: none; background: #f1f5f9; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
 .dark-theme .icon-btn { background: #1e293b; color: white; }
 
-/* HERO */
-.dashboard-hero {
-  background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
-  border-radius: 24px;
-  overflow: hidden;
-  position: relative;
-}
-.stat-card-inner {
-  background: rgba(255,255,255,0.1);
-  backdrop-filter: blur(5px);
-  border-radius: 18px;
-  padding: 15px;
-  text-align: center;
-}
+.dashboard-hero { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); border-radius: 24px; overflow: hidden; position: relative; }
+.stat-card-inner { background: rgba(255,255,255,0.1); backdrop-filter: blur(5px); border-radius: 18px; padding: 15px; text-align: center; }
 
-/* QR TRIGGER */
-.qr-trigger-card {
-  background: white;
-  border-radius: 20px;
-  transition: transform 0.2s;
-}
+.ai-trigger-card { background: white; border-radius: 20px; transition: 0.2s; }
+.dark-theme .ai-trigger-card { background: #1e293b; }
+.ai-icon-box { width: 54px; height: 54px; border-radius: 15px; background: #e0e7ff; display: flex; align-items: center; justify-content: center; }
+.text-indigo { color: #6366f1; }
+.bg-primary-subtle { background: rgba(99, 102, 241, 0.2) !important; }
+
+.camera-container { position: relative; width: 100%; height: 300px; background: #000; border-radius: 24px; overflow: hidden; }
+.video-preview { width: 100%; height: 100%; object-fit: cover; }
+.canvas-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+.ai-badge { position: absolute; top: 15px; right: 15px; background: rgba(0,0,0,0.6); color: white; padding: 5px 12px; border-radius: 10px; font-size: 0.7rem; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+
+/* TOMBOL CLOSE MODAL */
+.btn-close-modal { position: absolute; top: 20px; right: 20px; border: none; background: #f1f5f9; width: 35px; height: 35px; border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 10; font-size: 1rem; color: #64748b; }
+.dark-theme .btn-close-modal { background: #0f172a; color: white; }
+
+.qr-trigger-card { background: white; border-radius: 20px; transition: 0.2s; }
 .dark-theme .qr-trigger-card { background: #1e293b; }
-.qr-trigger-card:active { transform: scale(0.98); }
-.qr-icon-box {
-  width: 54px; height: 54px; border-radius: 15px;
-  background: #eef2ff; display: flex; align-items: center; justify-content: center;
-}
+.qr-icon-box { width: 54px; height: 54px; border-radius: 15px; background: #f1f5f9; display: flex; align-items: center; justify-content: center; }
 
-/* TABS & SEARCH */
-.tab-pill-container {
-  display: flex; gap: 5px; background: #f1f5f9; padding: 5px; border-radius: 12px;
-}
+.tab-pill-container { display: flex; gap: 5px; background: #f1f5f9; padding: 5px; border-radius: 12px; }
 .dark-theme .tab-pill-container { background: #0f172a; }
-.tab-pill-container button {
-  flex: 1; border: none; padding: 8px; border-radius: 8px;
-  font-size: 0.8rem; font-weight: 700; background: transparent; color: #64748b;
-}
+.tab-pill-container button { flex: 1; border: none; padding: 8px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; background: transparent; color: #64748b; }
 .tab-pill-container button.active { background: white; color: #6366f1; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
 .dark-theme .tab-pill-container button.active { background: #1e293b; color: white; }
 
-.search-input-group {
-  position: relative; display: flex; align-items: center;
-}
+.search-input-group { position: relative; display: flex; align-items: center; }
 .search-input-group i { position: absolute; left: 12px; color: #94a3b8; }
-.search-input-group input {
-  width: 100%; border: 1px solid #e2e8f0; border-radius: 12px;
-  padding: 10px 10px 10px 40px; font-size: 0.85rem; outline: none;
-}
+.search-input-group input { width: 100%; border: 1px solid #e2e8f0; border-radius: 12px; padding: 10px 10px 10px 40px; font-size: 0.85rem; outline: none; }
 .dark-theme .search-input-group input { background: #0f172a; border-color: #334155; color: white; }
 
-/* LIST ITEM */
 .student-item-row { border-bottom: 1px solid #f1f5f9; }
 .dark-theme .student-item-row { border-color: rgba(255,255,255,0.05); }
-.student-initial {
-  width: 36px; height: 36px; border-radius: 50%; background: #f8fafc;
-  display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.8rem;
-}
+.student-initial { width: 36px; height: 36px; border-radius: 50%; background: #f8fafc; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.8rem; }
 .dark-theme .student-initial { background: #0f172a; }
 
-.status-tag {
-  font-size: 0.65rem; font-weight: 800; padding: 4px 10px; border-radius: 8px;
-  display: flex; align-items: center; gap: 5px;
-}
+.status-tag { font-size: 0.65rem; font-weight: 800; padding: 4px 10px; border-radius: 8px; display: flex; align-items: center; gap: 5px; }
 .tag-hadir { background: #dcfce7; color: #15803d; }
 .tag-izin { background: #fef9c3; color: #854d0e; }
 .tag-sakit { background: #e0f2fe; color: #0369a1; }
 .tag-alfa { background: #fee2e2; color: #b91c1c; }
 .tag-pending { background: #f1f5f9; color: #94a3b8; }
 
-.btn-detail {
-  background: none; border: none; color: #6366f1; font-size: 0.7rem; font-weight: 700; padding: 0;
-}
-
-.border-top-dashed { border-top: 1px dashed #e2e8f0; }
-
-/* MODAL / SHEET */
-.sheet-overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,0.5);
-  backdrop-filter: blur(4px); z-index: 2000; display: flex; align-items: flex-end;
-}
-.sheet-content {
-  background: white; width: 100%; border-radius: 30px 30px 0 0;
-  padding: 25px; animation: slideUp 0.4s ease-out;
-}
+.sheet-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); z-index: 2000; display: flex; align-items: flex-end; }
+.sheet-content { background: white; width: 100%; border-radius: 30px 30px 0 0; padding: 25px; animation: slideUp 0.4s ease-out; }
 .dark-theme .sheet-content { background: #1e293b; }
 .drag-handle { width: 40px; height: 5px; background: #e2e8f0; border-radius: 5px; margin: 0 auto; }
 
-.qr-display-area {
-  background: white; padding: 25px; border-radius: 24px; text-align: center;
-}
-.qr-progress-bar {
-  height: 4px; background: #f1f5f9; border-radius: 2px; margin-top: 20px; overflow: hidden;
-}
-.bar-fill {
-  height: 100%; background: #6366f1; width: 100%;
-  animation: qrTimer 20s linear infinite;
-}
+.qr-display-area { background: white; padding: 25px; border-radius: 24px; text-align: center; }
+.qr-progress-bar { height: 4px; background: #f1f5f9; border-radius: 2px; margin-top: 20px; overflow: hidden; }
+.bar-fill { height: 100%; background: #6366f1; width: 100%; animation: qrTimer 20s linear infinite; }
 
-/* TOAST */
-.custom-toast {
-  position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
-  z-index: 3000; padding: 12px 24px; border-radius: 16px; color: white;
-  font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-  display: flex; align-items: center; gap: 10px;
-}
-.custom-toast.success { background: #1e293b; }
+.btn-reset-data { width: 100%; border: 1.5px dashed #ef4444; color: #ef4444; background: transparent; border-radius: 15px; padding: 12px; font-weight: 700; font-size: 0.8rem; }
 
-.btn-reset-data {
-  width: 100%; border: 1.5px dashed #ef4444; color: #ef4444;
-  background: transparent; border-radius: 15px; padding: 12px; font-weight: 700;
-  font-size: 0.8rem; transition: 0.2s;
-}
-.btn-reset-data:hover { background: rgba(239, 68, 68, 0.05); }
+.blink { animation: blinker 1.5s linear infinite; }
+.pulse-red { width: 8px; height: 8px; background: #ef4444; border-radius: 50%; box-shadow: 0 0 0 rgba(239, 68, 68, 0.4); animation: pulse 2s infinite; }
 
+.custom-toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 9999; padding: 12px 24px; border-radius: 12px; color: white; font-weight: 700; display: flex; align-items: center; gap: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+.custom-toast.success { background: #10b981; }
+.custom-toast.error { background: #ef4444; }
+
+@keyframes blinker { 50% { opacity: 0; } }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
 @keyframes qrTimer { from { width: 100%; } to { width: 0%; } }
 @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-
 .smaller { font-size: 0.7rem; }
-.dropdown-item:active { background-color: #f1f5f9; color: inherit; }
+.fw-black { font-weight: 900; }
+.border-top-dashed { border-top: 1px dashed #e2e8f0; }
+.btn-detail { background: none; border: none; color: #6366f1; font-weight: 700; font-size: 0.75rem; padding: 0; text-align: left; }
 </style>
