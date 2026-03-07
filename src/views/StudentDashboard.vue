@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { Html5Qrcode } from 'html5-qrcode'
 import axios from 'axios'
 
-// ASSETS
+// ASSETS (Pastikan path file ini benar di project Anda)
 import siswaImg from '../Siswa.jpg'
 import senamImg from '../senam.jpg'
 import bacaImg  from '../baca.jpg'
@@ -26,10 +26,10 @@ let html5QrCode = null
 let scanning = false
 const guruTokenPrefix = 'ABSENSI-GURU-'
 
-// NEW STATE: NOTIFICATION TOGGLE
+// NOTIFICATION STATE
 const isNotificationEnabled = ref(localStorage.getItem('notif_active') !== 'false')
 
-// Watcher untuk simpan preferensi notifikasi
+// Watcher preferensi notifikasi
 watch(isNotificationEnabled, (newVal) => {
   localStorage.setItem('notif_active', newVal)
   if (newVal) {
@@ -37,7 +37,7 @@ watch(isNotificationEnabled, (newVal) => {
   }
 })
 
-// Logic Quotes & Banner Slider
+// Banner Slider Logic
 const activeBannerIndex = ref(0)
 const banners = [
   { img: siswaImg, quote: "Senin: Pendidikan adalah tiket ke masa depan. Hari esok dimiliki oleh mereka yang mempersiapkannya hari ini." },
@@ -65,26 +65,27 @@ const moods = [
 
 const setMood = (mood) => {
   selectedMood.value = mood.label
+  const happyQuotes = [
+    "Energi positifmu menular! Pertahankan semangat luar biasa ini.",
+    "Hari yang cerah untuk jiwa yang penuh syukur. Teruslah bersinar!",
+    "Kebahagiaan adalah kunci kesuksesan. Selamat belajar!",
+    "Wujudkan mimpimu dengan senyuman hari ini!"
+  ]
+  const sadQuotes = [
+    "Jangan menyerah, badai pasti berlalu. Kamu lebih kuat dari yang kamu kira!",
+    "Satu kegagalan bukan berarti akhir. Istirahat sejenak, lalu bangkit lagi!",
+    "Setiap hari adalah kesempatan baru untuk memulai hal hebat.",
+    "Kamu berharga, dan dunia butuh cahaya darimu hari ini."
+  ]
+  
   if (mood.type === 'sad') {
-    const quotes = [
-      "Jangan menyerah, badai pasti berlalu. Kamu lebih kuat dari yang kamu kira!",
-      "Satu kegagalan bukan berarti akhir. Istirahat sejenak, lalu bangkit lagi!",
-      "Setiap hari adalah kesempatan baru untuk memulai hal hebat.",
-      "Kamu berharga, dan dunia butuh cahaya darimu hari ini."
-    ]
-    moodQuote.value = quotes[Math.floor(Math.random() * quotes.length)]
+    moodQuote.value = sadQuotes[Math.floor(Math.random() * sadQuotes.length)]
   } else {
-    const quotes = [
-      "Energi positifmu menular! Pertahankan semangat luar biasa ini.",
-      "Hari yang cerah untuk jiwa yang penuh syukur. Teruslah bersinar!",
-      "Kebahagiaan adalah kunci kesuksesan. Selamat belajar!",
-      "Wujudkan mimpimu dengan senyuman hari ini!"
-    ]
-    moodQuote.value = quotes[Math.floor(Math.random() * quotes.length)]
+    moodQuote.value = happyQuotes[Math.floor(Math.random() * happyQuotes.length)]
   }
 }
 
-// Logic Foto Profil
+// Foto Profil
 const handleImageUpload = (event) => {
   const file = event.target.files[0]
   if (file) {
@@ -97,24 +98,20 @@ const handleImageUpload = (event) => {
   }
 }
 
-// Deteksi Jenis Kelamin Sederhana
 const genderDetect = computed(() => {
   const name = student.value.name.toLowerCase()
   if (name.includes('putri') || name.includes('siti') || name.endsWith('a') || name.endsWith('i')) return 'Perempuan'
   return 'Laki-laki'
 })
 
-// State Jadwal & Config
 const jadwalHariIni = ref([])
 const schoolConfig = ref({ lat: null, lng: null, radius: 50 })
 
-// ================= AUDIO & VIBRATION =================
+// ================= AUDIO & FEEDBACK =================
 const playSuccessFeedback = () => {
   const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2185/2185-preview.mp3')
-  audio.play().catch((e) => console.log("Audio play blocked by browser"))
-  if ('vibrate' in navigator) {
-    navigator.vibrate([200, 100, 200])
-  }
+  audio.play().catch(() => console.log("Audio play blocked"))
+  if ('vibrate' in navigator) navigator.vibrate([200, 100, 200])
 }
 
 const toast = ref({ show:false, msg:'', type:'success' })
@@ -123,21 +120,24 @@ const showToast = (msg,type='success')=>{
   setTimeout(()=>toast.value.show=false,3000)
 }
 
-// ================= LOGIC NOTIFIKASI 31 MENIT =================
+// ================= NOTIFIKASI LOGIC =================
 let notificationInterval = null
 
 const requestNotificationPermission = () => {
-  if ("Notification" in window && isNotificationEnabled.value) {
-    Notification.requestPermission()
+  if ("Notification" in window) {
+    Notification.requestPermission().then(permission => {
+      if (permission === 'granted') {
+        console.log('Izin notifikasi diberikan.')
+      }
+    })
   }
 }
 
 const sendReminderNotification = () => {
-  // Cek jika siswa belum absen DAN fitur notifikasi diaktifkan oleh siswa
   if (student.value.status === 'Belum Absen' && isNotificationEnabled.value) {
     if (Notification.permission === "granted") {
       new Notification("Peringatan Absensi!", {
-        body: `Halo ${student.value.name}, kamu belum melakukan absen hari ini. Yuk segera scan QR Guru!`,
+        body: `Halo ${student.value.name}, kamu belum absen. Yuk scan QR sekarang!`,
         icon: '/favicon.ico'
       })
     }
@@ -145,7 +145,7 @@ const sendReminderNotification = () => {
   }
 }
 
-// ================= LOGIKA GEOLOCATION =================
+// ================= GEOLOCATION =================
 const calculateDistance = (lat1, lon1, lat2, lon2) => {
   const R = 6371e3 
   const dLat = (lat2 - lat1) * Math.PI / 180
@@ -175,7 +175,7 @@ const checkLocation = () => {
         if (distance <= schoolConfig.value.radius) resolve(true)
         else reject(`Di luar jangkauan (${Math.round(distance)}m).`)
       },
-      (err) => reject("Gagal akses GPS. Pastikan izin lokasi aktif."),
+      () => reject("Gagal akses GPS. Pastikan izin lokasi aktif."),
       { enableHighAccuracy: true, timeout: 6000 }
     )
   })
@@ -202,6 +202,41 @@ const loadGpsConfig = async () => {
     const res = await axios.get(`${backendUrl}/config/gps`)
     if(res.data) schoolConfig.value = res.data 
   } catch (e) { console.log('GPS config error', e) }
+}
+
+const loadAttendance = async ()=>{
+  try{
+    const res = await axios.get(`${backendUrl}/students`)
+    const me = res.data.find(s => s.nis === student.value.nis)
+    
+    if(me) {
+      student.value.name = me.name
+      student.value.class = me.class
+      student.value.status = me.status || 'Belum Absen'
+      
+      if(me.attendanceHistory) {
+        const stats = { hadir: 0, sakit: 0, izin: 0, alfa: 0 }
+        me.attendanceHistory.forEach(h => {
+          const s = h.status.toLowerCase()
+          if(s === 'hadir') stats.hadir++
+          else if(s === 'sakit') stats.sakit++
+          else if(s === 'izin') stats.izin++
+          else if(s === 'alfa' || s === 'mangkir') stats.alfa++
+        })
+        attendanceStats.value = stats
+      }
+
+      if(['Hadir', 'Sakit', 'Izin'].includes(me.status)) {
+        const lastAttendanceTime = me.attendanceHistory?.[me.attendanceHistory.length-1]?.timestamp || me.updatedAt
+        const diff = new Date().getTime() - new Date(lastAttendanceTime).getTime()
+        // Reset status jika sudah lewat 50 menit (contoh reset sesi pelajaran)
+        if (me.status === 'Hadir' && diff > (50 * 60 * 1000)) {
+          student.value.status = 'Belum Absen'
+        }
+        student.value.lastAttendance = lastAttendanceTime
+      }
+    }
+  } catch(err){ console.log('Load attendance error', err) }
 }
 
 // ================= SCANNER =================
@@ -276,40 +311,6 @@ const submitAttendance = async(token)=>{
   }
 }
 
-const loadAttendance = async ()=>{
-  try{
-    const res = await axios.get(`${backendUrl}/students`)
-    const me = res.data.find(s => s.nis === student.value.nis)
-    
-    if(me) {
-      student.value.name = me.name
-      student.value.class = me.class
-      student.value.status = me.status || 'Belum Absen'
-      
-      if(me.attendanceHistory) {
-        const stats = { hadir: 0, sakit: 0, izin: 0, alfa: 0 }
-        me.attendanceHistory.forEach(h => {
-          const s = h.status.toLowerCase()
-          if(s === 'hadir') stats.hadir++
-          else if(s === 'sakit') stats.sakit++
-          else if(s === 'izin') stats.izin++
-          else if(s === 'alfa' || s === 'mangkir') stats.alfa++
-        })
-        attendanceStats.value = stats
-      }
-
-      if(me.status === 'Hadir' || me.status === 'Sakit' || me.status === 'Izin') {
-        const lastAttendanceTime = me.attendanceHistory?.[me.attendanceHistory.length-1]?.timestamp || me.updatedAt
-        const diff = new Date().getTime() - new Date(lastAttendanceTime).getTime()
-        if (me.status === 'Hadir' && diff > (1 * 50 * 60 * 1000)) {
-          student.value.status = 'Belum Absen'
-        }
-        student.value.lastAttendance = lastAttendanceTime
-      }
-    }
-  } catch(err){ console.log('Load attendance error', err) }
-}
-
 const canAbsen = computed(() => {
   if (!student.value.lastAttendance || student.value.status !== 'Hadir') return true
   const lastTime = new Date(student.value.lastAttendance).getTime()
@@ -331,11 +332,8 @@ const closeGuide = () => {
   localStorage.setItem('hasSeenGuide', 'true')
 }
 
-// ================= LOGOUT LOGIC =================
-const confirmLogout = () => {
-  showLogoutConfirm.value = true
-}
-
+// ================= LOGOUT =================
+const confirmLogout = () => { showLogoutConfirm.value = true }
 const executeLogout = () => { 
   localStorage.clear()
   router.push('/login') 
@@ -343,18 +341,8 @@ const executeLogout = () => {
 
 // ================= LIFECYCLE =================
 onMounted(async () => {
+  // Langsung minta izin notifikasi saat login/masuk dashboard
   requestNotificationPermission()
-
-  const meta = document.createElement('meta')
-  meta.name = "viewport"
-  meta.content = "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
-  document.getElementsByTagName('head')[0].appendChild(meta)
-
-  document.addEventListener('touchstart', (event) => {
-    if (event.touches.length > 1) {
-      event.preventDefault()
-    }
-  }, { passive: false })
 
   const savedNis = localStorage.getItem('studentNis')
   if (!savedNis || savedNis === 'undefined') {
@@ -362,9 +350,7 @@ onMounted(async () => {
     return
   }
 
-  if (!localStorage.getItem('hasSeenGuide')) {
-    showGuide.value = true
-  }
+  if (!localStorage.getItem('hasSeenGuide')) showGuide.value = true
 
   student.value.nis = savedNis
   student.value.name = localStorage.getItem('studentName') || 'Siswa'
@@ -379,8 +365,11 @@ onMounted(async () => {
     fetchJadwalFromAdmin()
   ])
 
+  // Interval Update Data 30 detik
   const interval = setInterval(loadAttendance, 30000) 
-  notificationInterval = setInterval(sendReminderNotification, 1 * 60 * 1000)
+  
+  // Interval Notifikasi 1 Menit (Akurat)
+  notificationInterval = setInterval(sendReminderNotification, 60000)
   
   onUnmounted(() => {
     clearInterval(interval)
@@ -396,7 +385,7 @@ onUnmounted(()=> stopScan())
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
 
-  <transition name="toast-fade">
+  <transition name="fade">
     <div v-if="toast.show" class="custom-toast" :class="toast.type">
       <i :class="toast.type === 'success' ? 'bi bi-check-circle-fill' : (toast.type === 'info' ? 'bi bi-geo-alt-fill' : 'bi bi-exclamation-triangle-fill')"></i>
       {{ toast.msg }}
@@ -410,7 +399,7 @@ onUnmounted(()=> stopScan())
           <i class="bi bi-box-arrow-right text-danger"></i>
         </div>
         <h5 class="fw-bold mb-2">Yakin Ingin Keluar?</h5>
-        <p class="text-muted small mb-4">Kamu perlu login kembali menggunakan NIS untuk mengakses aplikasi ini.</p>
+        <p class="text-muted small mb-4">Kamu perlu login kembali menggunakan NIS untuk mengakses aplikasi.</p>
         <div class="d-flex gap-2">
           <button @click="showLogoutConfirm = false" class="btn btn-light w-100 py-2 rounded-pill fw-bold">Batal</button>
           <button @click="executeLogout" class="btn btn-danger w-100 py-2 rounded-pill fw-bold">Keluar</button>
@@ -423,29 +412,27 @@ onUnmounted(()=> stopScan())
     <div v-if="showGuide" class="guide-modal-overlay">
       <div class="guide-modal-content">
         <div class="text-center mb-4">
-          <div class="guide-icon-header">
-            <i class="bi bi-rocket-takeoff-fill"></i>
-          </div>
+          <div class="guide-icon-header"><i class="bi bi-rocket-takeoff-fill"></i></div>
           <h4 class="fw-bold mt-3">Halo, {{ student.name }}!</h4>
-          <p class="text-muted small">Yuk, pelajari cara absen di aplikasi ini</p>
+          <p class="text-muted small">Pelajari cara absen di aplikasi ini</p>
         </div>
         <div class="guide-steps">
           <div class="guide-step-item">
             <div class="step-icon"><i class="bi bi-geo-alt"></i></div>
             <div class="step-text">
               <h6>Aktifkan GPS</h6>
-              <p>Pastikan kamu berada dalam radius <strong>{{ schoolConfig.radius }}m</strong> dari sekolah.</p>
+              <p>Pastikan berada dalam radius <strong>{{ schoolConfig.radius }}m</strong>.</p>
             </div>
           </div>
           <div class="guide-step-item">
             <div class="step-icon"><i class="bi bi-qr-code-scan"></i></div>
             <div class="step-text">
               <h6>Scan QR Guru</h6>
-              <p>Klik tombol <strong>ABSENSI</strong> dan arahkan kamera ke QR Code yang diberikan Guru.</p>
+              <p>Klik <strong>ABSENSI</strong> dan arahkan kamera ke QR Guru.</p>
             </div>
           </div>
         </div>
-        <button @click="closeGuide" class="btn btn-primary-custom w-100 py-3 mt-3">Saya Mengerti, Mulai!</button>
+        <button @click="closeGuide" class="btn btn-primary-custom w-100 py-3 mt-3">Mulai!</button>
       </div>
     </div>
   </transition>
@@ -459,7 +446,7 @@ onUnmounted(()=> stopScan())
         </div>
         <div>
           <h6 class="mb-0 fw-bold text-dark text-truncate" style="max-width: 150px;">{{ student.name }}</h6>
-          <small class="text-muted">Lihat Profil <i class="bi bi-chevron-right small"></i></small>
+          <small class="text-muted">Profil <i class="bi bi-chevron-right small"></i></small>
         </div>
       </div>
       <button @click="confirmLogout" class="btn btn-light btn-sm rounded-pill px-3 text-danger fw-bold">
@@ -511,9 +498,7 @@ onUnmounted(()=> stopScan())
       </div>
       <div class="study-quote-bar p-3 bg-white">
         <div class="d-flex align-items-center">
-            <div class="quote-lamp me-3">
-                <i class="bi bi-lightbulb-fill text-warning"></i>
-            </div>
+            <div class="quote-lamp me-3"><i class="bi bi-lightbulb-fill text-warning"></i></div>
             <p class="mb-0 smaller fw-bold text-dark italic-quote">"{{ banners[activeBannerIndex].quote }}"</p>
         </div>
       </div>
@@ -571,7 +556,7 @@ onUnmounted(()=> stopScan())
       </div>
       
       <div class="profile-body p-4">
-        <label class="text-muted smaller fw-bold mb-2 d-block">REKAPITULASI KEHADIRAN</label>
+        <label class="text-muted smaller fw-bold mb-2 d-block">REKAPITULASI</label>
         <div class="row g-2 mb-4">
           <div class="col-3"><div class="stat-card hadir"><span class="stat-val">{{ attendanceStats.hadir }}</span><span class="stat-lbl">Hadir</span></div></div>
           <div class="col-3"><div class="stat-card sakit"><span class="stat-val">{{ attendanceStats.sakit }}</span><span class="stat-lbl">Sakit</span></div></div>
@@ -584,35 +569,22 @@ onUnmounted(()=> stopScan())
           <div class="p-3 d-flex justify-content-between align-items-center">
             <div>
               <span class="fw-bold d-block small">Pengingat Absen</span>
-              <small class="text-muted smaller">Terima notifikasi setiap 1 menit</small>
+              <small class="text-muted smaller">Notifikasi setiap 1 menit</small>
             </div>
             <div class="form-check form-switch">
-              <input class="form-check-input" type="checkbox" role="switch" v-model="isNotificationEnabled" style="width: 2.5em; height: 1.25em;">
+              <input class="form-check-input" type="checkbox" v-model="isNotificationEnabled">
             </div>
-          </div>
-        </div>
-
-        <div class="info-group mb-4">
-          <label class="text-muted smaller fw-bold mb-2 d-block">INFORMASI PRIBADI</label>
-          <div class="info-item shadow-sm border">
-            <div class="p-3 border-bottom d-flex justify-content-between"><span class="text-muted">NIS</span><span class="fw-bold">{{ student.nis }}</span></div>
-            <div class="p-3 border-bottom d-flex justify-content-between"><span class="text-muted">Kelas</span><span class="fw-bold">{{ student.class }}</span></div>
-            <div class="p-3 d-flex justify-content-between"><span class="text-muted">Jenis Kelamin</span><span class="fw-bold">{{ genderDetect }}</span></div>
           </div>
         </div>
 
         <div class="info-group mb-5">
-          <label class="text-muted smaller fw-bold mb-2 d-block">LOKASI SEKARANG</label>
-          <div class="info-item shadow-sm border p-3 d-flex align-items-center mb-4">
-            <i class="bi bi-geo-alt-fill text-danger fs-4 me-3"></i>
-            <div>
-              <p class="mb-0 fw-bold small">Area SMK Negeri 1 Cianjur</p>
-              <p class="mb-0 text-muted smaller">Kabupaten Cianjur, Jawa Barat</p>
-            </div>
+          <label class="text-muted smaller fw-bold mb-2 d-block">INFORMASI PRIBADI</label>
+          <div class="info-item shadow-sm border">
+            <div class="p-3 border-bottom d-flex justify-content-between"><span class="text-muted">NIS</span><span class="fw-bold">{{ student.nis }}</span></div>
+            <div class="p-3 border-bottom d-flex justify-content-between"><span class="text-muted">Kelas</span><span class="fw-bold">{{ student.class }}</span></div>
+            <div class="p-3 d-flex justify-content-between"><span class="text-muted">Gender</span><span class="fw-bold">{{ genderDetect }}</span></div>
           </div>
-          <button @click="confirmLogout" class="btn btn-outline-danger w-100 py-3 rounded-4 fw-bold">
-            <i class="bi bi-box-arrow-right me-2"></i> Keluar Aplikasi
-          </button>
+          <button @click="confirmLogout" class="btn btn-outline-danger w-100 py-3 rounded-4 fw-bold mt-4">Keluar</button>
         </div>
       </div>
     </div>
@@ -621,8 +593,8 @@ onUnmounted(()=> stopScan())
   <transition name="fade">
     <div v-if="qrVisible" class="scanner-fullscreen">
       <div class="scanner-nav p-3 d-flex justify-content-between align-items-center text-white">
-        <button @click="stopScan" class="btn btn-outline-light btn-sm rounded-pill px-3"><i class="bi bi-x-lg me-1"></i> Batal</button>
-        <span class="small fw-bold">ARAHKAN KE QR GURU</span>
+        <button @click="stopScan" class="btn btn-outline-light btn-sm rounded-pill px-3">Batal</button>
+        <span class="small fw-bold">SCAN QR GURU</span>
         <div style="width: 70px"></div>
       </div>
       <div class="scanner-body">
@@ -638,7 +610,7 @@ onUnmounted(()=> stopScan())
     </div>
   </transition>
 
-  <transition name="sheet">
+  <transition name="fade">
     <div v-if="scheduleVisible" class="sheet-overlay" @click.self="scheduleVisible=false">
       <div class="sheet-content">
         <div class="sheet-handle"></div>
@@ -652,7 +624,7 @@ onUnmounted(()=> stopScan())
               <div class="time-box me-3"><span class="fw-bold text-primary smaller">{{ j.jam }}</span></div>
               <div>
                 <strong class="d-block text-dark small mb-1">{{ j.mapel }}</strong>
-                <div class="text-muted smaller d-flex align-items-center"><i class="bi bi-person me-1"></i> {{ j.guru }}</div>
+                <div class="text-muted smaller"><i class="bi bi-person me-1"></i> {{ j.guru }}</div>
               </div>
             </div>
           </div>
