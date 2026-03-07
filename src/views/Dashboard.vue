@@ -13,6 +13,7 @@ const students = ref([])
 const searchQuery = ref('')
 const showHistoryFor = ref(null)
 const activeTab = ref('hadir')
+const isRefreshing = ref(false) // State untuk loading refresh
 
 // --- Filter Jurusan Lengkap ---
 const selectedClass = ref('XII RPL 2') 
@@ -37,7 +38,7 @@ let detectionInterval = null
 let stream = null
 
 // ===== QR GURU =====
-const guruTokenPrefix = 'ABSENSI-GURU-'
+const guruTokenPrefix = 'ABSENSI-GURU'
 const guruQr = ref('')
 let qrInterval = null
 const showQrModal = ref(false)
@@ -153,7 +154,8 @@ const initAiDetection = async () => {
 }
 
 // ================= LOGIC =================
-const loadStudents = async () => {
+const loadStudents = async (isManual = false) => {
+  if (isManual) isRefreshing.value = true
   try {
     const res = await axios.get(`${backendUrl}/students`)
     const today = new Date().toDateString() 
@@ -177,8 +179,12 @@ const loadStudents = async () => {
         })
       }
     })
+    if (isManual) showToast('Data berhasil diperbarui')
   } catch (err) {
     console.error('Load siswa gagal:', err)
+    if (isManual) showToast('Gagal sinkronisasi data', 'error')
+  } finally {
+    if (isManual) isRefreshing.value = false
   }
 }
 
@@ -214,8 +220,11 @@ const logout = () => {
   router.replace('/login')
 }
 
+// FUNGSI GENERATE QR DENGAN TOKEN DINAMIS (EXPIRE LOGIC)
 const generateQr = async () => {
-  const qrData = `${guruTokenPrefix}-${Date.now()}`
+  // Menambahkan timestamp unik agar QR lama otomatis tidak valid jika di-scan ulang
+  const timestamp = Date.now()
+  const qrData = `${guruTokenPrefix}-${timestamp}`
   guruQr.value = await QRCode.toDataURL(qrData)
 }
 
@@ -233,7 +242,6 @@ const preventZoom = (e) => {
 // ================= BRIGHTNESS MONITOR =================
 watch(showQrModal, (newVal) => {
   if (newVal) {
-    // Memberikan feedback visual senter melalui CSS overlay
     document.body.classList.add('qr-open-brightness')
   } else {
     document.body.classList.remove('qr-open-brightness')
@@ -241,7 +249,6 @@ watch(showQrModal, (newVal) => {
 })
 
 onMounted(async () => {
-  // Disable Zoom on Mobile
   document.addEventListener('touchmove', preventZoom, { passive: false })
   document.addEventListener('gesturestart', (e) => e.preventDefault())
 
@@ -267,8 +274,14 @@ onMounted(async () => {
 
   user.value.name = localStorage.getItem('teacherName') || 'Guru'
   await loadStudents()
+  
+  // Inisialisasi QR Pertama
   await generateQr()
-  qrInterval = setInterval(generateQr, 20000)
+  
+  // Set interval untuk mengganti QR setiap 20 detik
+  qrInterval = setInterval(async () => {
+    await generateQr()
+  }, 20000)
 })
 
 onUnmounted(() => {
@@ -366,10 +379,15 @@ onUnmounted(() => {
 
     <section class="list-section bg-white rounded-4 shadow-sm overflow-hidden mb-4">
       <div class="p-3 border-bottom">
-        <div class="tab-pill-container mb-3">
-          <button @click="activeTab = 'hadir'" :class="{ active: activeTab === 'hadir' }">Terdata</button>
-          <button @click="activeTab = 'belum'" :class="{ active: activeTab === 'belum' }">Belum</button>
-          <button @click="activeTab = 'semua'" :class="{ active: activeTab === 'semua' }">Semua</button>
+        <div class="d-flex align-items-center justify-content-between mb-3">
+            <div class="tab-pill-container flex-grow-1 me-2">
+                <button @click="activeTab = 'hadir'" :class="{ active: activeTab === 'hadir' }">Terdata</button>
+                <button @click="activeTab = 'belum'" :class="{ active: activeTab === 'belum' }">Belum</button>
+                <button @click="activeTab = 'semua'" :class="{ active: activeTab === 'semua' }">Semua</button>
+            </div>
+            <button @click="loadStudents(true)" class="btn-refresh" :class="{ spinning: isRefreshing }">
+                <i class="bi bi-arrow-clockwise"></i>
+            </button>
         </div>
         <div class="search-input-group">
           <i class="bi bi-search"></i>
@@ -445,7 +463,7 @@ onUnmounted(() => {
           <p class="text-muted small">Mata Pelajaran: {{ user.mapel || 'Sesi Guru' }}</p>
         </div>
         <div class="qr-display-area zoom-qr shadow-lg">
-          <img :src="guruQr" class="img-fluid rounded-3 qr-main-img" alt="QR Code" />
+          <img :key="guruQr" :src="guruQr" class="img-fluid rounded-3 qr-main-img" alt="QR Code" />
           <div class="qr-progress-bar"><div class="bar-fill"></div></div>
         </div>
         <button @click="showQrModal=false" class="btn btn-dark w-100 rounded-pill py-3 mt-4 fw-bold shadow">Tutup</button>
@@ -497,25 +515,25 @@ onUnmounted(() => {
   font-family: 'Plus Jakarta Sans', sans-serif; 
   min-height: 100vh; 
   transition: background 0.3s; 
-  user-select: none; /* No text select like App */
-  touch-action: manipulation; /* Prevent double tap zoom */
+  user-select: none; 
+  touch-action: manipulation; 
   -webkit-user-drag: none;
 }
 
 /* QR ZOOM & BRIGHTNESS EFFECT */
 .qr-brightness-active {
-  background: rgba(255, 255, 255, 0.95) !important; /* Terang Maksimal di Background */
+  background: rgba(255, 255, 255, 0.95) !important; 
   backdrop-filter: brightness(1.5) blur(10px) !important;
 }
 
 .zoom-qr {
-  transform: scale(1.1); /* Otomatis agak Zoom In */
+  transform: scale(1.1); 
   transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
   box-shadow: 0 0 50px rgba(99, 102, 241, 0.4) !important;
 }
 
 .qr-main-img {
-  filter: contrast(1.2) brightness(1.1); /* Memperjelas QR agar mudah discan */
+  filter: contrast(1.2) brightness(1.1); 
 }
 
 /* THEMES */
@@ -557,6 +575,11 @@ onUnmounted(() => {
 .tab-pill-container button { flex: 1; border: none; padding: 8px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; background: transparent; color: #64748b; }
 .tab-pill-container button.active { background: white; color: #6366f1; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
 .dark-theme .tab-pill-container button.active { background: #1e293b; color: white; }
+
+.btn-refresh { border: none; background: #f1f5f9; width: 40px; height: 40px; border-radius: 12px; color: #6366f1; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
+.dark-theme .btn-refresh { background: #0f172a; color: white; }
+.spinning { animation: rotate 1s linear infinite; }
+@keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
 .search-input-group { position: relative; display: flex; align-items: center; }
 .search-input-group i { position: absolute; left: 12px; color: #94a3b8; }
