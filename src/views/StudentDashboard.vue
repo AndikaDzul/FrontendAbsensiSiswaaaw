@@ -5,7 +5,7 @@ import { Html5Qrcode } from 'html5-qrcode'
 import axios from 'axios'
 
 // ASSETS
-import siswaImg from '../Siswa.jpg'
+import smkzieImg from '../smkzie.jpg'
 import senamImg from '../senam.jpg'
 import bacaImg  from '../baca.jpg'
 import ekologiImg from '../ekologi.jpg'
@@ -40,7 +40,7 @@ watch(isNotificationEnabled, (newVal) => {
 // Banner Slider Logic
 const activeBannerIndex = ref(0)
 const banners = [
-  { img: siswaImg, quote: "Senin: Pendidikan adalah tiket ke masa depan. Hari esok dimiliki oleh mereka yang mempersiapkannya hari ini." },
+  { img: smkzieImg, quote: "Senin: Pendidikan adalah tiket ke masa depan. Hari esok dimiliki oleh mereka yang mempersiapkannya hari ini." },
   { img: senamImg, quote: "Selasa: Tubuh yang sehat adalah kunci pikiran yang jernih. Jangan lupa olahraga dan tetap bugar!" },
   { img: bacaImg,  quote: "Rabu: Membaca adalah jendela dunia. Semakin banyak kamu membaca, semakin banyak hal yang kamu ketahui." },
   { img: ekologiImg, quote: "Kamis: Cintailah alam seperti dirimu sendiri. Lingkungan yang bersih menciptakan kenyamanan dalam belajar." },
