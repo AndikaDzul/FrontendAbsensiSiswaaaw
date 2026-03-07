@@ -7,7 +7,8 @@ import axios from 'axios'
 // ASSETS
 import siswaImg from '../Siswa.jpg'
 import senamImg from '../senam.jpg'
-
+import bacaImg  from '../baca.jpg'
+import ekologiImg from '../ekologi.jpg'
 const router = useRouter()
 const backendUrl = 'https://backend-complited.vercel.app'
 
@@ -27,11 +28,19 @@ const activeBannerIndex = ref(0)
 const banners = [
   { 
     img: siswaImg, 
-    quote: "Pendidikan adalah tiket ke masa depan. Hari esok dimiliki oleh mereka yang mempersiapkannya hari ini." 
+    quote: "Senin: Pendidikan adalah tiket ke masa depan. Hari esok dimiliki oleh mereka yang mempersiapkannya hari ini." 
   },
   { 
     img: senamImg, 
-    quote: "Tubuh yang sehat adalah kunci pikiran yang jernih. Jangan lupa olahraga dan tetap bugar!" 
+    quote: "Selasa: Tubuh yang sehat adalah kunci pikiran yang jernih. Jangan lupa olahraga dan tetap bugar!" 
+  },
+  { 
+    img: bacaImg, 
+    quote: "Rabu: Membaca adalah jendela dunia. Semakin banyak kamu membaca, semakin banyak hal yang kamu ketahui." 
+  },
+  { 
+    img: ekologiImg, 
+    quote: "Kamis: Cintailah alam seperti dirimu sendiri. Lingkungan yang bersih menciptakan kenyamanan dalam belajar." 
   }
 ]
 
@@ -428,6 +437,8 @@ onUnmounted(()=> stopScan())
         </button>
       </div>
     </div>
+
+    <h6 class="fw-bold mb-2 text-dark px-1">Jenis Kegiatan</h6>
 
     <div class="banner-container mb-4 shadow-sm">
       <div class="banner-scroll-wrapper" @scroll="onBannerScroll">
