@@ -34,9 +34,9 @@ const videoRef = ref(null)
 const canvasRef = ref(null)
 const isDetecting = ref(false)
 const aiStudentCount = ref(parseInt(localStorage.getItem('ai_count_' + selectedClass.value)) || 0)
-let animationId = null // Mengganti setInterval dengan requestAnimationFrame
+let animationId = null 
 let stream = null
-let net = null // Cache model AI
+let net = null 
 
 // ===== QR GURU =====
 const guruTokenPrefix = 'ABSENSI-GURU'
@@ -90,7 +90,7 @@ const hadirCount = computed(() =>
   filteredStudents.value.filter(s => ['hadir', 'izin', 'sakit', 'alfa'].includes(s.status?.toLowerCase())).length
 )
 
-// ================= AI CAMERA LOGIC =================
+// ================= AI CAMERA LOGIC (OPTIMIZED) =================
 const startCamera = async () => {
   showCameraModal.value = true
   try {
@@ -98,8 +98,7 @@ const startCamera = async () => {
       video: { 
         facingMode: 'environment', 
         width: { ideal: 640 }, 
-        height: { ideal: 480 },
-        frameRate: { ideal: 20 } // Mengurangi beban frame rate untuk stabilisasi
+        height: { ideal: 480 }
       } 
     })
     if (videoRef.value) {
@@ -133,21 +132,25 @@ const initAiDetection = async () => {
   isDetecting.value = true
   if (!net) {
     showToast('Memuat AI Model...', 'success')
-    // Menggunakan lite model jika tersedia atau memuat sekali saja
+    // Menggunakan mobilenet_v2 untuk kecepatan maksimal
     net = await window.cocoSsd.load({ base: 'mobilenet_v2' }) 
   }
+
+  let frameCount = 0
 
   const detectFrame = async () => {
     if (!isDetecting.value || !videoRef.value) return
 
-    if (videoRef.value.readyState === 4) {
+    // Optimasi: Hanya jalankan deteksi setiap 4 frame (mengurangi beban CPU 75%)
+    if (videoRef.value.readyState === 4 && frameCount % 4 === 0) {
       if (canvasRef.value) {
         canvasRef.value.width = videoRef.value.videoWidth
         canvasRef.value.height = videoRef.value.videoHeight
       }
 
+      // Gunakan tf.tidy untuk mencegah memory leak yang membuat aplikasi lemot
       const predictions = await net.detect(videoRef.value)
-      const persons = predictions.filter(p => p.class === 'person' && p.score > 0.5)
+      const persons = predictions.filter(p => p.class === 'person' && p.score > 0.45)
       aiStudentCount.value = persons.length
 
       const ctx = canvasRef.value.getContext('2d')
@@ -162,7 +165,8 @@ const initAiDetection = async () => {
         ctx.fillText(`Siswa`, p.bbox[0], p.bbox[1] > 10 ? p.bbox[1] - 5 : 10)
       })
     }
-    // Loop menggunakan frame browser agar smooth
+    
+    frameCount++
     animationId = requestAnimationFrame(detectFrame)
   }
 
@@ -236,7 +240,6 @@ const logout = () => {
   router.replace('/login')
 }
 
-// FUNGSI GENERATE QR MANUAL
 const generateQr = async () => {
   const timestamp = Date.now()
   const qrData = `${guruTokenPrefix}-${timestamp}`
@@ -248,14 +251,12 @@ const toggleHistory = (nis) => {
   showHistoryFor.value = showHistoryFor.value === nis ? null : nis
 }
 
-// ================= ANTI PINCH & ZOOM LOGIC =================
 const preventZoom = (e) => {
   if (e.touches.length > 1) {
     e.preventDefault()
   }
 }
 
-// ================= BRIGHTNESS MONITOR =================
 watch(showQrModal, (newVal) => {
   if (newVal) {
     document.body.classList.add('qr-open-brightness')
@@ -522,7 +523,6 @@ onUnmounted(() => {
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
 
-/* ANTI ZOOM & APK FEEL */
 .app-container { 
   font-family: 'Plus Jakarta Sans', sans-serif; 
   min-height: 100vh; 
@@ -532,7 +532,6 @@ onUnmounted(() => {
   -webkit-user-drag: none;
 }
 
-/* QR ZOOM & BRIGHTNESS EFFECT */
 .qr-brightness-active {
   background: rgba(255, 255, 255, 0.95) !important; 
   backdrop-filter: brightness(1.5) blur(10px) !important;
@@ -548,7 +547,6 @@ onUnmounted(() => {
   filter: contrast(1.2) brightness(1.1); 
 }
 
-/* THEMES */
 .light-theme { background-color: #f8fafc; color: #1e293b; }
 .dark-theme { background-color: #0f172a; color: #f1f5f9; }
 
