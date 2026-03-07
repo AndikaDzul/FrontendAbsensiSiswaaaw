@@ -30,34 +30,30 @@ const guruTokenPrefix = 'ABSENSI-GURU-'
 
 const isNotificationEnabled = ref(localStorage.getItem('notif_active') !== 'false')
 
-// ================= LOGIKA GETAR & SUARA (FIXED) =================
+// ================= LOGIKA GETAR & SUARA (ALARM MODE) =================
 let reminderInterval = null;
-let currentAudio = null; // Tambahkan referensi audio agar bisa di-stop
 
 const playReminderFeedback = () => {
-  // Cek ketat sebelum menjalankan feedback
   if (!isNotificationEnabled.value || student.value.status !== 'Belum Absen') {
     stopReminderSystem();
     return;
   }
 
-  // Efek Suara - Gunakan referensi variabel agar bisa dimatikan paksa
-  if (currentAudio) {
-    currentAudio.pause();
-    currentAudio = null;
-  }
-  
-  currentAudio = new Audio('https://assets.mixkit.co/active_storage/sfx/2185/2185-preview.mp3');
-  currentAudio.play().catch(() => {});
+  // Efek Suara Alarm (Suara Peringatan Keras)
+  const audio = new Audio('https://raw.githubusercontent.com/freeCodeCamp/cdn/master/build/testable-projects-fcc/audio/BeepSound.wav');
+  audio.volume = 1.0; // Set volume maksimal (0.0 ke 1.0)
+  audio.play().catch(() => {
+    console.log("Autoplay diblokir browser, butuh interaksi user pertama kali.");
+  });
 
-  // Efek Getar
+  // Efek Getar Pola Alarm (Panjang-Pendek)
   if ('vibrate' in navigator) {
-    navigator.vibrate([200, 100, 200, 100, 200, 100, 200, 100, 200]);
+    navigator.vibrate([500, 200, 500, 200, 500, 200, 500]);
   }
 };
 
 const startReminderSystem = () => {
-  stopReminderSystem(); // Reset jika sudah ada yang jalan
+  stopReminderSystem(); 
   
   if (isNotificationEnabled.value && student.value.status === 'Belum Absen') {
     showVibrateBanner.value = true;
@@ -66,7 +62,7 @@ const startReminderSystem = () => {
     // Jalankan feedback pertama kali
     playReminderFeedback();
     
-    // Ulangi setiap 8 detik
+    // Ulangi setiap 8 detik (bisa dipercepat jika ingin lebih mendesak)
     reminderInterval = setInterval(() => {
       playReminderFeedback();
     }, 8000);
@@ -74,24 +70,11 @@ const startReminderSystem = () => {
 };
 
 const stopReminderSystem = () => {
-  // 1. Hentikan Interval
   if (reminderInterval) {
     clearInterval(reminderInterval);
     reminderInterval = null;
   }
-  
-  // 2. Hentikan Suara yang sedang berjalan
-  if (currentAudio) {
-    currentAudio.pause();
-    currentAudio.currentTime = 0;
-    currentAudio = null;
-  }
-
-  // 3. Hentikan Getar
-  if ('vibrate' in navigator) {
-    navigator.vibrate(0); 
-  }
-
+  if ('vibrate' in navigator) navigator.vibrate(0); 
   showVibrateBanner.value = false;
   updateBackgroundReminder();
 };
