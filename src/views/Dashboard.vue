@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import QRCode from 'qrcode'
 import axios from 'axios'
@@ -14,23 +14,16 @@ const searchQuery = ref('')
 const showHistoryFor = ref(null)
 const activeTab = ref('hadir')
 
-// --- Filter Jurusan Lengkap (X, XI, XII) ---
+// --- Filter Jurusan Lengkap ---
 const selectedClass = ref('XII RPL 2') 
 const classOptions = [
-  'X RPL 1', 'X RPL 2', 'X RPL 3',
-  'X AKL 1', 'X AKL 2', 'X AKL 3',
-  'X TJKT 1', 'X TJKT 2', 'X TJKT 3',
-  'X MPLB 1', 'X MPLB 2', 'X MPLB 3',
-  'X PS 1', 'X PS 2', 'X PS 3', 'X PS 5',
-  'XI RPL 1', 'XI RPL 2', 'XI RPL 3',
-  'XI AKL 1', 'XI AKL 2', 'XI AKL 3',
-  'XI TJKT 1', 'XI TJKT 2', 'XI TJKT 3',
-  'XI MPLB 1', 'XI MPLB 2', 'XI MPLB 3',
-  'XI PS 1', 'XI PS 2', 'XI PS 3',
-  'XII RPL 1', 'XII RPL 2', 'XII RPL 3', 
-  'XII AKL 1', 'XII AKL 2', 'XII AKL 3',
-  'XII TJKT 1', 'XII TJKT 2', 'XII TJKT 3',
-  'XII MPLB 1', 'XII MPLB 2', 'XII MPLB 3',
+  'X RPL 1', 'X RPL 2', 'X RPL 3', 'X AKL 1', 'X AKL 2', 'X AKL 3',
+  'X TJKT 1', 'X TJKT 2', 'X TJKT 3', 'X MPLB 1', 'X MPLB 2', 'X MPLB 3',
+  'X PS 1', 'X PS 2', 'X PS 3', 'X PS 5', 'XI RPL 1', 'XI RPL 2', 'XI RPL 3',
+  'XI AKL 1', 'XI AKL 2', 'XI AKL 3', 'XI TJKT 1', 'XI TJKT 2', 'XI TJKT 3',
+  'XI MPLB 1', 'XI MPLB 2', 'XI MPLB 3', 'XI PS 1', 'XI PS 2', 'XI PS 3',
+  'XII RPL 1', 'XII RPL 2', 'XII RPL 3', 'XII AKL 1', 'XII AKL 2', 'XII AKL 3',
+  'XII TJKT 1', 'XII TJKT 2', 'XII TJKT 3', 'XII MPLB 1', 'XII MPLB 2', 'XII MPLB 3',
   'XII PS 1', 'XII PS 2', 'XII PS 3'
 ]
 
@@ -75,7 +68,6 @@ const avatarInitial = computed(() =>
 const filteredStudents = computed(() => {
   let list = students.value
   if (selectedClass.value) {
-    // Memastikan filter mencocokkan string kelas dengan tepat
     list = list.filter(s => (s.class || '').trim() === selectedClass.value)
   }
   if (activeTab.value === 'hadir') {
@@ -136,24 +128,18 @@ const initAiDetection = async () => {
   if (!window.cocoSsd) {
     showToast('Memuat AI Model...', 'success')
   }
-  
   const model = await window.cocoSsd.load()
-  
   detectionInterval = setInterval(async () => {
     if (videoRef.value && videoRef.value.readyState === 4 && isDetecting.value) {
       if (canvasRef.value) {
         canvasRef.value.width = videoRef.value.videoWidth
         canvasRef.value.height = videoRef.value.videoHeight
       }
-
       const predictions = await model.detect(videoRef.value)
       const persons = predictions.filter(p => p.class === 'person' && p.score > 0.5)
-      
       aiStudentCount.value = persons.length
-      
       const ctx = canvasRef.value.getContext('2d')
       ctx.clearRect(0, 0, canvasRef.value.width, canvasRef.value.height)
-      
       persons.forEach(p => {
         ctx.strokeStyle = '#6366f1'
         ctx.lineWidth = 4
@@ -237,7 +223,28 @@ const toggleHistory = (nis) => {
   showHistoryFor.value = showHistoryFor.value === nis ? null : nis
 }
 
+// ================= ANTI PINCH & ZOOM LOGIC =================
+const preventZoom = (e) => {
+  if (e.touches.length > 1) {
+    e.preventDefault()
+  }
+}
+
+// ================= BRIGHTNESS MONITOR =================
+watch(showQrModal, (newVal) => {
+  if (newVal) {
+    // Memberikan feedback visual senter melalui CSS overlay
+    document.body.classList.add('qr-open-brightness')
+  } else {
+    document.body.classList.remove('qr-open-brightness')
+  }
+})
+
 onMounted(async () => {
+  // Disable Zoom on Mobile
+  document.addEventListener('touchmove', preventZoom, { passive: false })
+  document.addEventListener('gesturestart', (e) => e.preventDefault())
+
   if (!document.getElementById('bootstrap-js')) {
     const script = document.createElement('script')
     script.id = 'bootstrap-js'
@@ -250,7 +257,6 @@ onMounted(async () => {
     tf.id = 'tfjs'
     tf.src = "https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"
     document.head.appendChild(tf)
-    
     tf.onload = () => {
       const coco = document.createElement('script')
       coco.id = 'coco-ssd'
@@ -266,6 +272,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  document.removeEventListener('touchmove', preventZoom)
   if (qrInterval) clearInterval(qrInterval)
   stopCamera()
 })
@@ -337,7 +344,7 @@ onUnmounted(() => {
           <i class="bi bi-camera-video-fill text-indigo fs-3"></i>
         </div>
         <div class="text-start flex-grow-1">
-          <h6 class="fw-bold mb-0">Hitung Siswa (AI Camera)</h6>
+          <h6 class="fw-bold mb-0">Hitung Siswa (Camera System)</h6>
           <small class="text-muted">Deteksi otomatis jumlah orang di kelas</small>
         </div>
         <i class="bi bi-record-circle text-danger blink"></i>
@@ -381,7 +388,6 @@ onUnmounted(() => {
                   <small class="text-muted smaller">{{ s.nis }} • {{ s.class }}</small>
                 </div>
               </div>
-              
               <div class="d-flex flex-column align-items-end gap-1">
                 <span :class="['status-tag', 
                   s.status?.toLowerCase() === 'hadir' ? 'tag-hadir' : 
@@ -391,7 +397,6 @@ onUnmounted(() => {
                   <i :class="s.status ? 'bi bi-check-circle-fill' : 'bi bi-clock'"></i>
                   {{ s.status || 'Belum Absen' }}
                 </span>
-
                 <div class="dropdown">
                   <button class="btn btn-sm btn-light py-0 px-2 smaller fw-bold border" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                     Set Manual <i class="bi bi-chevron-down"></i>
@@ -405,7 +410,6 @@ onUnmounted(() => {
                 </div>
               </div>
             </div>
-            
             <div v-if="s.status" class="mt-2 pt-2 border-top-dashed d-flex flex-column gap-1">
                 <button @click="toggleHistory(s.nis)" class="btn-detail">
                   {{ showHistoryFor === s.nis ? 'Sembunyikan' : 'Lihat Detail Waktu' }}
@@ -420,7 +424,6 @@ onUnmounted(() => {
             </div>
           </div>
         </TransitionGroup>
-
         <div v-if="filteredStudents.length === 0" class="text-center py-5">
           <i class="bi bi-folder2-open display-4 text-muted mb-2"></i>
           <p class="text-muted small">Tidak ada data di kelas {{ selectedClass }}</p>
@@ -434,18 +437,18 @@ onUnmounted(() => {
   </main>
 
   <Transition name="sheet">
-    <div v-if="showQrModal" class="sheet-overlay" @click.self="showQrModal=false">
+    <div v-if="showQrModal" class="sheet-overlay qr-brightness-active" @click.self="showQrModal=false">
       <div class="sheet-content">
         <div class="drag-handle mb-4"></div>
         <div class="text-center mb-4">
           <h5 class="fw-bold mb-1">QR Code Presensi</h5>
           <p class="text-muted small">Mata Pelajaran: {{ user.mapel || 'Sesi Guru' }}</p>
         </div>
-        <div class="qr-display-area shadow-sm">
-          <img :src="guruQr" class="img-fluid rounded-3" alt="QR Code" />
+        <div class="qr-display-area zoom-qr shadow-lg">
+          <img :src="guruQr" class="img-fluid rounded-3 qr-main-img" alt="QR Code" />
           <div class="qr-progress-bar"><div class="bar-fill"></div></div>
         </div>
-        <button @click="showQrModal=false" class="btn btn-dark w-100 rounded-pill py-3 mt-4 fw-bold">Tutup</button>
+        <button @click="showQrModal=false" class="btn btn-dark w-100 rounded-pill py-3 mt-4 fw-bold shadow">Tutup</button>
       </div>
     </div>
   </Transition>
@@ -456,26 +459,22 @@ onUnmounted(() => {
         <button @click="stopCamera" class="btn-close-modal">
           <i class="bi bi-x-lg"></i>
         </button>
-
         <div class="drag-handle mb-4"></div>
         <div class="text-center mb-3">
           <h5 class="fw-bold mb-0">AI Student Scanner</h5>
           <p class="text-muted small">Mendeteksi jumlah siswa secara otomatis</p>
         </div>
-
         <div class="camera-container shadow-sm mb-3">
           <video ref="videoRef" autoplay muted playsinline class="video-preview"></video>
           <canvas ref="canvasRef" class="canvas-overlay"></canvas>
           <div class="ai-badge">
-            <div class="pulse-red"></div> LIVE AI
+            <div class="pulse-red"></div> HUMAN CAMERA
           </div>
         </div>
-
         <div class="text-center p-3 bg-light rounded-4">
           <h1 class="fw-black text-indigo mb-0">{{ aiStudentCount }}</h1>
           <small class="fw-bold text-muted">Siswa Terdeteksi</small>
         </div>
-
         <div class="d-flex gap-2 mt-4">
           <button @click="stopCamera" class="btn btn-light flex-grow-1 rounded-pill py-3 fw-bold border">
             Batal
@@ -493,7 +492,33 @@ onUnmounted(() => {
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
 
-.app-container { font-family: 'Plus Jakarta Sans', sans-serif; min-height: 100vh; transition: background 0.3s; }
+/* ANTI ZOOM & APK FEEL */
+.app-container { 
+  font-family: 'Plus Jakarta Sans', sans-serif; 
+  min-height: 100vh; 
+  transition: background 0.3s; 
+  user-select: none; /* No text select like App */
+  touch-action: manipulation; /* Prevent double tap zoom */
+  -webkit-user-drag: none;
+}
+
+/* QR ZOOM & BRIGHTNESS EFFECT */
+.qr-brightness-active {
+  background: rgba(255, 255, 255, 0.95) !important; /* Terang Maksimal di Background */
+  backdrop-filter: brightness(1.5) blur(10px) !important;
+}
+
+.zoom-qr {
+  transform: scale(1.1); /* Otomatis agak Zoom In */
+  transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 0 50px rgba(99, 102, 241, 0.4) !important;
+}
+
+.qr-main-img {
+  filter: contrast(1.2) brightness(1.1); /* Memperjelas QR agar mudah discan */
+}
+
+/* THEMES */
 .light-theme { background-color: #f8fafc; color: #1e293b; }
 .dark-theme { background-color: #0f172a; color: #f1f5f9; }
 
