@@ -19,7 +19,7 @@ const loadCompressionLibrary = () => {
 import smkzieImg from '../smkzie.jpg'
 import senamImg from '../senam.jpg'
 import bacaImg from '../baca.jpg'
-import ekologiImg from '../ekologi.jpg'
+import KamisImg from '../Kamis.jpg'
 import jumatImg from '../jumat.jpg'
 
 const router = useRouter()
@@ -170,7 +170,7 @@ const banners = [
   { img: smkzieImg, quote: "Senin: Pendidikan adalah tiket ke masa depan. Hari esok dimiliki oleh mereka yang mempersiapkannya hari ini." },
   { img: senamImg, quote: "Selasa: Tubuh yang sehat adalah kunci pikiran yang jernih. Jangan lupa olahraga dan tetap bugar!" },
   { img: bacaImg,  quote: "Rabu: Membaca adalah jendela dunia. Semakin banyak kamu membaca, semakin banyak hal yang kamu ketahui." },
-  { img: ekologiImg, quote: "Kamis: Cintailah alam seperti dirimu sendiri. Lingkungan yang bersih menciptakan kenyamanan dalam belajar." },
+  { img: KamisImg, quote: "Kamis: Cintailah alam seperti dirimu sendiri. Lingkungan yang bersih menciptakan kenyamanan dalam belajar." },
   { img: jumatImg, quote: "Jumat: Hari terbaik di mana matahari terbit. Mulailah dengan bismillah." }
 ]
 
