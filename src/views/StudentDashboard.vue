@@ -28,11 +28,6 @@ let html5QrCode = null
 let scanning = false
 const guruTokenPrefix = 'ABSENSI-GURU-'
 
-// Fitur Bukti Absensi
-const evidenceFile = ref(null)
-const evidencePreview = ref(null)
-const isUploadingEvidence = ref(false)
-
 const isNotificationEnabled = ref(localStorage.getItem('notif_active') !== 'false')
 
 // ================= LOGIKA GETAR & SUARA (ALARM MODE) =================
@@ -160,38 +155,6 @@ const handleImageUpload = (event) => {
       localStorage.setItem(`profile_img_${student.value.nis}`, e.target.result)
     }
     reader.readAsDataURL(file)
-  }
-}
-
-// Bukti Absensi Upload Logic
-const handleEvidenceFile = (event) => {
-  const file = event.target.files[0]
-  if (file) {
-    evidenceFile.value = file
-    const reader = new FileReader()
-    reader.onload = (e) => evidencePreview.value = e.target.result
-    reader.readAsDataURL(file)
-  }
-}
-
-const submitEvidence = async () => {
-  if (!evidenceFile.value) return showToast('Pilih foto terlebih dahulu', 'error')
-  
-  isUploadingEvidence.value = true
-  const formData = new FormData()
-  formData.append('evidence', evidenceFile.value)
-
-  try {
-    await axios.post(`${backendUrl}/students/attendance/evidence/${student.value.nis}`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    })
-    showToast('Bukti absensi berhasil disimpan!')
-    evidenceFile.value = null
-    evidencePreview.value = null
-  } catch (err) {
-    showToast('Gagal mengirim bukti', 'error')
-  } finally {
-    isUploadingEvidence.value = false
   }
 }
 
@@ -497,38 +460,6 @@ onUnmounted(()=> {
         <button class="action-card btn btn-white w-100 py-4 shadow-sm" @click="scheduleVisible = true">
           <i class="bi bi-info-circle d-block mb-2 fs-2 text-primary"></i><span class="fw-bold small">INFO & JADWAL</span>
         </button>
-      </div>
-    </div>
-
-    <h6 class="fw-bold mb-2 text-dark px-1">Unggah Bukti Kehadiran</h6>
-    <div class="evidence-section bg-white p-4 rounded-4 shadow-sm border mb-4">
-      <p class="smaller text-muted mb-3">Kirim foto kegiatan atau swafoto sebagai bukti tambahan kehadiran hari ini.</p>
-      
-      <div class="evidence-upload-box text-center">
-        <div v-if="!evidencePreview" class="upload-placeholder border-dashed rounded-3 p-4 mb-3" @click="$refs.evidenceInput.click()">
-          <i class="bi bi-camera fs-1 text-muted"></i>
-          <p class="small text-muted mb-0">Klik untuk ambil/pilih foto</p>
-        </div>
-        
-        <div v-else class="preview-container mb-3 position-relative">
-          <img :src="evidencePreview" class="img-fluid rounded-3 shadow-sm border" style="max-height: 200px;">
-          <button @click="evidencePreview = null; evidenceFile = null" class="btn btn-danger btn-sm rounded-circle position-absolute top-0 end-0 translate-middle">
-            <i class="bi bi-x"></i>
-          </button>
-        </div>
-
-        <input type="file" ref="evidenceInput" @change="handleEvidenceFile" accept="image/*" capture="environment" hidden>
-        
-        <button 
-          @click="submitEvidence" 
-          class="btn btn-primary-custom w-100 py-2 fw-bold" 
-          :disabled="!evidenceFile || isUploadingEvidence || student.status !== 'Hadir'"
-        >
-          <span v-if="isUploadingEvidence" class="spinner-border spinner-border-sm me-2"></span>
-          <i v-else class="bi bi-cloud-arrow-up-fill me-2"></i>
-          Simpan Bukti Kehadiran
-        </button>
-        <small v-if="student.status !== 'Hadir'" class="text-danger smaller d-block mt-2">Anda harus absen QR terlebih dahulu.</small>
       </div>
     </div>
 

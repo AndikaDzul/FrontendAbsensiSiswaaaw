@@ -6,7 +6,7 @@ import axios from 'axios'
 
 const router = useRouter()
 // Sesuaikan dengan URL Backend kamu
-const backendUrl = 'https://project-backend-beres-5z94.vercel.app' 
+const backendUrl = 'https://backend-complited.vercel.app'
 const apiUrl = 'https://project-backend-beres-5z94.vercel.app/api'
 
 // ================= STATE =================
