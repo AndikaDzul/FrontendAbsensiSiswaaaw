@@ -174,27 +174,34 @@ const loadStudents = async (isManual = false) => {
     const today = new Date().toDateString() 
     
     students.value = res.data.map(s => {
-      // 1. Ambil history hari ini
       const historyArr = s.attendanceHistory || []
       const todayHistory = historyArr.filter(h => {
         if (!h.timestamp) return false
         return new Date(h.timestamp).toDateString() === today
       })
 
-      // 2. Ambil status terbaru
       const isPresentToday = todayHistory.length > 0
       const latestRecord = isPresentToday ? todayHistory[todayHistory.length - 1] : null
       const currentStatus = latestRecord ? latestRecord.status : null
       
-      // 3. LOGIC FOTO: Ambil evidencePath dari record terbaru jika ada
-      const evidenceUrl = latestRecord && latestRecord.evidencePath 
-        ? `${backendUrl}/${latestRecord.evidencePath}` 
-        : null;
+      // LOGIC DRIVE: Cek apakah path berisi link drive atau path server lokal
+      let finalEvidenceUrl = null;
+      let isDriveLink = false;
+
+      if (latestRecord && latestRecord.evidencePath) {
+        if (latestRecord.evidencePath.includes('drive.google.com') || latestRecord.evidencePath.includes('http')) {
+            finalEvidenceUrl = latestRecord.evidencePath;
+            isDriveLink = true;
+        } else {
+            finalEvidenceUrl = `${backendUrl}/${latestRecord.evidencePath}`;
+        }
+      }
 
       return {
         ...s,
         status: currentStatus,
-        evidenceUrl: evidenceUrl, // URL Foto Siswa
+        evidenceUrl: finalEvidenceUrl,
+        isDriveLink: isDriveLink, // Flag untuk UI
         attendanceHistory: todayHistory.map(h => {
           const d = new Date(h.timestamp)
           return {
@@ -426,6 +433,10 @@ onUnmounted(() => {
                   <i :class="s.status ? 'bi bi-check-circle-fill' : 'bi bi-clock'"></i>
                   {{ s.status || 'Belum Absen' }}
                 </span>
+                <span v-if="s.isDriveLink" class="badge bg-success-subtle text-success smaller p-1" style="font-size: 0.55rem;">
+                   <i class="bi bi-google"></i> Foto Terkirim (Drive)
+                </span>
+
                 <div class="dropdown">
                   <button class="btn btn-sm btn-light py-0 px-2 smaller fw-bold border" type="button" data-bs-toggle="dropdown">
                     Set Manual <i class="bi bi-chevron-down"></i>
@@ -443,7 +454,7 @@ onUnmounted(() => {
             <div v-if="s.status" class="mt-2 pt-2 border-top-dashed d-flex flex-column gap-2">
                 <button @click="toggleHistory(s.nis)" class="btn-detail text-start">
                   <i class="bi bi-eye-fill me-1"></i>
-                  {{ showHistoryFor === s.nis ? 'Sembunyikan Detail' : 'Lihat Waktu & Bukti Foto' }}
+                  {{ showHistoryFor === s.nis ? 'Sembunyikan Detail' : (s.isDriveLink ? 'Lihat Waktu & Link Google Drive' : 'Lihat Waktu & Bukti Foto') }}
                 </button>
                 
                 <div v-if="showHistoryFor === s.nis" class="detail-expanded p-2 bg-light rounded-3 border">
@@ -454,9 +465,20 @@ onUnmounted(() => {
 
                   <div v-if="s.evidenceUrl" class="mt-2">
                     <label class="smaller fw-bold text-muted d-block mb-1">BUKTI FOTO:</label>
-                    <img :src="s.evidenceUrl" class="img-fluid rounded-3 border shadow-sm" style="max-height: 250px; width: 100%; object-fit: cover; cursor: pointer;" @click="window.open(s.evidenceUrl, '_blank')">
-                    <small class="d-block text-muted mt-1" style="font-size: 0.6rem;">Klik gambar untuk memperbesar</small>
+                    
+                    <div v-if="s.isDriveLink">
+                       <a :href="s.evidenceUrl" target="_blank" class="btn btn-primary w-100 py-2 rounded-3 fw-bold smaller">
+                          <i class="bi bi-box-arrow-up-right me-2"></i> Buka Foto di Google Drive
+                       </a>
+                       <small class="d-block text-muted mt-2 text-center" style="font-size: 0.6rem;">Foto disimpan di folder cloud siswa</small>
+                    </div>
+
+                    <div v-else>
+                        <img :src="s.evidenceUrl" class="img-fluid rounded-3 border shadow-sm" style="max-height: 250px; width: 100%; object-fit: cover; cursor: pointer;" @click="window.open(s.evidenceUrl, '_blank')">
+                        <small class="d-block text-muted mt-1" style="font-size: 0.6rem;">Klik gambar untuk memperbesar</small>
+                    </div>
                   </div>
+                  
                   <div v-else class="text-danger smaller py-2 text-center bg-white rounded border">
                     <i class="bi bi-image-fill me-1"></i> Siswa belum mengunggah foto.
                   </div>
@@ -565,7 +587,6 @@ onUnmounted(() => {
 .camera-container { position: relative; width: 100%; height: 300px; background: #000; border-radius: 24px; overflow: hidden; }
 .video-preview { width: 100%; height: 100%; object-fit: cover; }
 .canvas-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
-.ai-badge { position: absolute; top: 15px; right: 15px; background: rgba(0,0,0,0.6); color: white; padding: 5px 12px; border-radius: 10px; font-size: 0.7rem; font-weight: 800; display: flex; align-items: center; gap: 8px; }
 
 .btn-close-modal { position: absolute; top: 20px; right: 20px; border: none; background: #f1f5f9; width: 35px; height: 35px; border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 10; font-size: 1rem; color: #64748b; }
 .dark-theme .btn-close-modal { background: #0f172a; color: white; }
@@ -612,17 +633,16 @@ onUnmounted(() => {
 .btn-reset-data { width: 100%; border: 1.5px dashed #ef4444; color: #ef4444; background: transparent; border-radius: 15px; padding: 12px; font-weight: 700; font-size: 0.8rem; }
 
 .blink { animation: blinker 1.5s linear infinite; }
-.pulse-red { width: 8px; height: 8px; background: #ef4444; border-radius: 50%; box-shadow: 0 0 0 rgba(239, 68, 68, 0.4); animation: pulse 2s infinite; }
 
 .custom-toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 9999; padding: 12px 24px; border-radius: 12px; color: white; font-weight: 700; display: flex; align-items: center; gap: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
 .custom-toast.success { background: #10b981; }
 .custom-toast.error { background: #ef4444; }
 
 @keyframes blinker { 50% { opacity: 0; } }
-@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
 @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 .smaller { font-size: 0.7rem; }
 .fw-black { font-weight: 900; }
 .border-top-dashed { border-top: 1px dashed #e2e8f0; }
 .btn-detail { background: none; border: none; color: #6366f1; font-weight: 700; font-size: 0.75rem; padding: 0; text-align: left; }
+.bg-success-subtle { background-color: rgba(16, 185, 129, 0.15) !important; }
 </style>

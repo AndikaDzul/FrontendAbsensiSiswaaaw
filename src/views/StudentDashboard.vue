@@ -4,6 +4,17 @@ import { useRouter } from 'vue-router'
 import { Html5Qrcode } from 'html5-qrcode'
 import axios from 'axios'
 
+// Tambahkan library kompresi secara dinamis
+const loadCompressionLibrary = () => {
+  return new Promise((resolve) => {
+    if (window.imageCompression) return resolve();
+    const script = document.createElement('script');
+    script.src = "https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.js";
+    script.onload = () => resolve();
+    document.head.appendChild(script);
+  });
+};
+
 // ASSETS
 import smkzieImg from '../smkzie.jpg'
 import senamImg from '../senam.jpg'
@@ -24,11 +35,41 @@ const profileVisible = ref(false)
 const profileImage = ref(null)    
 const showLogoutConfirm = ref(false) 
 const showVibrateBanner = ref(false) 
+const isSendingEmail = ref(false)
 let html5QrCode = null  
 let scanning = false
 const guruTokenPrefix = 'ABSENSI-GURU-'
 
 const isNotificationEnabled = ref(localStorage.getItem('notif_active') !== 'false')
+
+// ================= LOGIKA KIRIM BUKTI (DIRECT TO DRIVE) =================
+const handleSendEvidence = async (event) => {
+  const file = event.target.files[0]
+  if (!file) return
+
+  isSendingEmail.value = true
+  showToast('Membuka Google Drive...', 'info')
+
+  try {
+    // URL Google Drive Tujuan
+    const driveFolderUrl = 'https://drive.google.com/drive/folders/1HodwvYQ6k4mamvY5kOuFjr8ZPhqhYTkj'
+    
+    // Memberikan delay sedikit agar user sempat membaca toast
+    setTimeout(() => {
+      // Membuka folder Drive di tab baru agar siswa bisa upload manual ke folder tersebut
+      window.open(driveFolderUrl, '_blank')
+      showToast('Silahkan upload foto ke folder Drive', 'success')
+      isSendingEmail.value = false
+    }, 1500)
+
+  } catch (error) {
+    console.error("Error:", error);
+    showToast('Gagal membuka link', 'error')
+    isSendingEmail.value = false
+  } finally {
+    event.target.value = '' 
+  }
+}
 
 // ================= LOGIKA GETAR & SUARA (ALARM MODE) =================
 let reminderInterval = null;
@@ -333,6 +374,7 @@ const executeLogout = () => {
 
 onMounted(async () => {
   requestNotificationPermission()
+  loadCompressionLibrary(); 
   const savedNis = localStorage.getItem('studentNis')
   if (!savedNis || savedNis === 'undefined') { router.replace('/login'); return }
   if (!localStorage.getItem('hasSeenGuide')) showGuide.value = true
@@ -450,7 +492,7 @@ onUnmounted(()=> {
       </div>
     </section>
 
-    <div class="row g-3 mb-4">
+    <div class="row g-3 mb-3">
       <div class="col-6">
         <button class="action-card btn w-100 py-4 shadow-sm" @click="startScan" :disabled="!canAbsen" :class="!canAbsen ? 'disabled-card' : 'scan-active'">
           <i class="bi bi-qr-code-scan d-block mb-2 fs-2"></i><span class="fw-bold small">ABSENSI</span>
@@ -460,6 +502,17 @@ onUnmounted(()=> {
         <button class="action-card btn btn-white w-100 py-4 shadow-sm" @click="scheduleVisible = true">
           <i class="bi bi-info-circle d-block mb-2 fs-2 text-primary"></i><span class="fw-bold small">INFO & JADWAL</span>
         </button>
+      </div>
+    </div>
+
+    <div class="row mb-4">
+      <div class="col-12">
+        <label class="action-card btn btn-white w-100 py-4 shadow-sm border-0 position-relative d-flex flex-column align-items-center justify-content-center" style="cursor: pointer; background: white;">
+          <input type="file" @change="handleSendEvidence" accept="image/*" capture="environment" hidden :disabled="isSendingEmail">
+          <div v-if="isSendingEmail" class="spinner-border spinner-border-sm text-success mb-2" role="status"></div>
+          <i v-else class="bi bi-camera-fill d-block mb-2 fs-2 text-success"></i>
+          <span class="fw-bold small">{{ isSendingEmail ? 'MENGALIHKAN...' : 'KIRIM BUKTI KE DRIVE' }}</span>
+        </label>
       </div>
     </div>
 
