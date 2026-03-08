@@ -42,32 +42,42 @@ const guruTokenPrefix = 'ABSENSI-GURU-'
 
 const isNotificationEnabled = ref(localStorage.getItem('notif_active') !== 'false')
 
-// ================= LOGIKA KIRIM BUKTI (DIRECT TO DRIVE) =================
-const isUploading = ref(false) // Flag untuk mendeteksi status upload
+// ================= LOGIKA KIRIM BUKTI (FIXED FOR APK) =================
+const isUploading = ref(false)
 
 const handleSendEvidenceDirect = () => {
   const driveFolderUrl = 'https://drive.google.com/drive/folders/1HodwvYQ6k4mamvY5kOuFjr8ZPhqhYTkj?usp=sharing'
   
-  showToast('Membuka Drive... Pastikan sudah login Google', 'info')
-  isUploading.value = true // Tandai bahwa user sedang diarahkan keluar untuk upload
+  showToast('Membuka Browser Sistem...', 'info')
+  isUploading.value = true 
   
   setTimeout(() => {
-    try {
-      const newWindow = window.open(driveFolderUrl, '_blank', 'noopener,noreferrer');
-      if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
-        window.location.href = driveFolderUrl;
+    // Perbaikan untuk APK: Menggunakan elemen <a> tersembunyi untuk memaksa sistem membuka browser
+    const link = document.createElement('a');
+    link.href = driveFolderUrl;
+    link.target = '_blank'; // Untuk Web
+    link.rel = 'noopener noreferrer';
+    
+    // Atribut khusus untuk beberapa wrapper APK agar membuka di browser eksternal
+    link.setAttribute('data-rel', 'external'); 
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    // Fallback jika click() tidak merespon
+    setTimeout(() => {
+      if (isUploading.value) {
+        window.location.assign(driveFolderUrl);
       }
-    } catch (e) {
-      window.location.href = driveFolderUrl;
-    }
+    }, 500);
   }, 800)
 }
 
-// Logika Deteksi Kembali ke Halaman Absensi
 const handleWindowFocus = () => {
   if (isUploading.value) {
     showToast('Kembali ke Halaman Absensi', 'success')
-    isUploading.value = false // Reset flag
+    isUploading.value = false 
   }
 }
 
@@ -373,7 +383,7 @@ const executeLogout = () => {
 }
 
 onMounted(async () => {
-  window.addEventListener('focus', handleWindowFocus); // Pasang event listener focus
+  window.addEventListener('focus', handleWindowFocus); 
   requestNotificationPermission()
   loadCompressionLibrary(); 
   const savedNis = localStorage.getItem('studentNis')
@@ -393,7 +403,7 @@ onMounted(async () => {
   onUnmounted(() => { 
     clearInterval(interval); 
     stopReminderSystem();
-    window.removeEventListener('focus', handleWindowFocus); // Bersihkan listener
+    window.removeEventListener('focus', handleWindowFocus); 
   })
 })
 
@@ -513,7 +523,7 @@ onUnmounted(()=> {
         <button class="action-card btn btn-white w-100 py-4 shadow-sm border-0 d-flex flex-column align-items-center justify-content-center" @click="handleSendEvidenceDirect">
           <i class="bi bi-cloud-arrow-up-fill d-block mb-2 fs-2 text-success"></i>
           <span class="fw-bold small">UPLOAD FOTO KE DRIVE</span>
-          <small class="text-muted mt-1" style="font-size: 10px;">Gunakan browser Chrome/Safari agar lancar</small>
+          <small class="text-muted mt-1" style="font-size: 10px;">Klik untuk membuka Browser Utama</small>
         </button>
       </div>
     </div>
