@@ -43,32 +43,16 @@ const guruTokenPrefix = 'ABSENSI-GURU-'
 const isNotificationEnabled = ref(localStorage.getItem('notif_active') !== 'false')
 
 // ================= LOGIKA KIRIM BUKTI (DIRECT TO DRIVE) =================
-const handleSendEvidence = async (event) => {
-  const file = event.target.files[0]
-  if (!file) return
-
-  isSendingEmail.value = true
-  showToast('Membuka Google Drive...', 'info')
-
-  try {
-    // URL Google Drive Tujuan
-    const driveFolderUrl = 'https://drive.google.com/drive/folders/1HodwvYQ6k4mamvY5kOuFjr8ZPhqhYTkj'
-    
-    // Memberikan delay sedikit agar user sempat membaca toast
-    setTimeout(() => {
-      // Membuka folder Drive di tab baru agar siswa bisa upload manual ke folder tersebut
-      window.open(driveFolderUrl, '_blank')
-      showToast('Silahkan upload foto ke folder Drive', 'success')
-      isSendingEmail.value = false
-    }, 1500)
-
-  } catch (error) {
-    console.error("Error:", error);
-    showToast('Gagal membuka link', 'error')
-    isSendingEmail.value = false
-  } finally {
-    event.target.value = '' 
-  }
+// Disederhanakan sesuai permintaan: Langsung buka link tanpa selfie/upload local
+const handleSendEvidenceDirect = () => {
+  const driveFolderUrl = 'https://drive.google.com/drive/folders/1HodwvYQ6k4mamvY5kOuFjr8ZPhqhYTkj'
+  
+  showToast('Mengalihkan ke Google Drive...', 'info')
+  
+  // Memberikan sedikit delay agar user melihat toast informasi
+  setTimeout(() => {
+    window.open(driveFolderUrl, '_blank')
+  }, 1000)
 }
 
 // ================= LOGIKA GETAR & SUARA (ALARM MODE) =================
@@ -507,12 +491,10 @@ onUnmounted(()=> {
 
     <div class="row mb-4">
       <div class="col-12">
-        <label class="action-card btn btn-white w-100 py-4 shadow-sm border-0 position-relative d-flex flex-column align-items-center justify-content-center" style="cursor: pointer; background: white;">
-          <input type="file" @change="handleSendEvidence" accept="image/*" capture="environment" hidden :disabled="isSendingEmail">
-          <div v-if="isSendingEmail" class="spinner-border spinner-border-sm text-success mb-2" role="status"></div>
-          <i v-else class="bi bi-camera-fill d-block mb-2 fs-2 text-success"></i>
-          <span class="fw-bold small">{{ isSendingEmail ? 'MENGALIHKAN...' : 'KIRIM BUKTI KE DRIVE' }}</span>
-        </label>
+        <button class="action-card btn btn-white w-100 py-4 shadow-sm border-0 d-flex flex-column align-items-center justify-content-center" @click="handleSendEvidenceDirect">
+          <i class="bi bi-camera-fill d-block mb-2 fs-2 text-success"></i>
+          <span class="fw-bold small">KIRIM BUKTI KE DRIVE</span>
+        </button>
       </div>
     </div>
 
