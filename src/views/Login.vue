@@ -9,17 +9,16 @@
     <Transition name="fade">
       <div v-if="loading" class="premium-loader">
         <div class="loader-content">
-          <div class="logo-morph">
-            <img src="../andika.jvg.png" alt="Loading..." class="loader-img">
-            <div class="ring"></div>
-            <div class="ring"></div>
+          <div class="loader-visual">
+            <div class="spinner-ring"></div>
+            <img src="../andika.jvg.png" alt="Loading..." class="loader-logo">
           </div>
-          <div class="text-animation">
-            <h2 class="shimmer">ZIESEN</h2>
-            <div class="progress-bar">
-              <div class="progress-fill"></div>
+          <div class="loader-text">
+            <h2 class="brand-name">ZIESEN</h2>
+            <p class="status-msg">Memverifikasi Sesi...</p>
+            <div class="loading-bar">
+              <div class="bar-fill"></div>
             </div>
-            <p class="status-text">Memverifikasi Sesi...</p>
           </div>
         </div>
       </div>
@@ -112,15 +111,12 @@ const role = ref('siswa')
 const error = ref('')
 const loading = ref(false)
 
-// 1. CEK LOGIN SECEPAT MUNGKIN (Instant Check)
 const checkAuth = () => {
   const isLoggedIn = localStorage.getItem('isLoggedIn')
   const savedRole = localStorage.getItem('role')
   
   if (isLoggedIn === 'true' && savedRole) {
     loading.value = true
-    // Langsung arahkan tanpa menunggu 1.5 detik jika memungkinkan
-    // setTimeout hanya untuk pemanis loading
     setTimeout(() => {
       if (savedRole === 'siswa') router.replace('/student-dashboard')
       else if (savedRole === 'guru') router.push('/dashboard')
@@ -131,7 +127,6 @@ const checkAuth = () => {
 }
 
 onMounted(() => {
-  // Jalankan cek auth saat mount
   checkAuth()
 
   document.addEventListener('wheel', (e) => {
@@ -162,6 +157,12 @@ watch(role, (newRole) => {
 
 const handleLogin = async () => {
   error.value = ''
+  
+  if (!navigator.onLine) {
+    error.value = 'Mohon periksa koneksi Anda. Perangkat tidak terhubung ke internet.'
+    return
+  }
+
   loading.value = true
   try {
     let endpoint = role.value === 'guru' ? '/teachers/login' : 
@@ -189,7 +190,11 @@ const handleLogin = async () => {
       router.push(role.value === 'guru' ? '/dashboard' : '/admin-dashboard')
     }
   } catch (err) {
-    error.value = err.response?.data?.message || 'Data login tidak sesuai.'
+    if (err.message === 'Network Error') {
+      error.value = 'Gagal menghubungi server. Mohon periksa koneksi internet Anda.'
+    } else {
+      error.value = err.response?.data?.message || 'Data login tidak sesuai.'
+    }
     loading.value = false
   }
 }
@@ -210,14 +215,13 @@ const handleLogin = async () => {
   overflow: hidden; 
   position: relative; 
   padding: 20px;
-  touch-action: pan-x pan-y;
 }
 
+/* --- REFINED FLAT LOADING SCREEN --- */
 .premium-loader {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.95);
-  backdrop-filter: blur(15px);
+  background: #0f172a;
   z-index: 9999;
   display: flex;
   justify-content: center;
@@ -225,91 +229,81 @@ const handleLogin = async () => {
 }
 
 .loader-content {
-  text-align: center;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 30px;
+  gap: 25px;
 }
 
-.logo-morph {
+.loader-visual {
   position: relative;
-  width: 120px;
-  height: 120px;
+  width: 100px;
+  height: 100px;
   display: flex;
   justify-content: center;
   align-items: center;
 }
 
-.loader-img {
-  width: 70px;
-  height: 70px;
-  z-index: 2;
-  filter: drop-shadow(0 0 10px rgba(59, 130, 246, 0.5));
-  animation: pulseLogo 2s infinite ease-in-out;
-}
-
-.ring {
+.spinner-ring {
   position: absolute;
-  border: 2px solid transparent;
-  border-top-color: #3b82f6;
+  width: 100%;
+  height: 100%;
+  border: 3px solid rgba(59, 130, 246, 0.1);
+  border-top: 3px solid #3b82f6;
   border-radius: 50%;
-  animation: spin 1.5s linear infinite;
+  animation: spin 1s linear infinite;
 }
 
-.ring:nth-child(2) {
-  width: 110px;
-  height: 110px;
-  border-bottom-color: #1e40af;
-  animation-duration: 2s;
-  animation-direction: reverse;
+.loader-logo {
+  width: 50px;
+  height: 50px;
+  object-fit: contain;
+  opacity: 0.9;
 }
 
-.ring:nth-child(3) {
-  width: 130px;
-  height: 130px;
-  border-right-color: #60a5fa;
-  animation-duration: 2.5s;
+.loader-text {
+  text-align: center;
 }
 
-@keyframes spin { 100% { transform: rotate(360deg); } }
-@keyframes pulseLogo { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.8; } }
-
-.shimmer {
+.brand-name {
   color: white;
-  font-size: 1.5rem;
+  font-size: 1.2rem;
   font-weight: 800;
-  letter-spacing: 4px;
-  background: linear-gradient(90deg, #1e40af, #ffffff, #1e40af);
-  background-size: 200% auto;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: shimmerText 2s linear infinite;
+  letter-spacing: 3px;
+  margin: 0;
 }
 
-@keyframes shimmerText { to { background-position: 200% center; } }
+.status-msg {
+  color: #94a3b8;
+  font-size: 0.8rem;
+  margin: 5px 0 15px 0;
+}
 
-.progress-bar {
-  width: 200px;
-  height: 4px;
-  background: rgba(255,255,255,0.1);
+.loading-bar {
+  width: 140px;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.05);
   border-radius: 10px;
   overflow: hidden;
-  margin: 10px 0;
+  margin: 0 auto;
 }
 
-.progress-fill {
+.bar-fill {
   height: 100%;
-  width: 50%;
+  width: 30%;
   background: #3b82f6;
   border-radius: 10px;
-  animation: progressMove 1.5s infinite ease-in-out;
+  animation: barProgress 1.5s infinite ease-in-out;
 }
 
-@keyframes progressMove { 0% { transform: translateX(-100%); } 100% { transform: translateX(200%); } }
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+@keyframes barProgress {
+  0% { width: 0%; transform: translateX(-100%); }
+  50% { width: 40%; }
+  100% { width: 0%; transform: translateX(400%); }
+}
 
-.status-text { color: #94a3b8; font-size: 0.85rem; font-weight: 500; }
-
+/* --- BACKGROUND & CARD --- */
 .bg-decoration { position: absolute; width: 100%; height: 100%; z-index: 0; }
 .blob { position: absolute; border-radius: 50%; filter: blur(100px); opacity: 0.4; }
 .blob-1 { width: 400px; height: 400px; background: #3b82f6; top: -100px; right: -50px; }
@@ -319,7 +313,6 @@ const handleLogin = async () => {
   width: 100%; max-width: 420px; 
   padding: 80px 25px 30px; 
   background: rgba(255, 255, 255, 0.98); 
-  backdrop-filter: blur(20px);
   border-radius: 35px; z-index: 10; 
   text-align: center; position: relative;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
