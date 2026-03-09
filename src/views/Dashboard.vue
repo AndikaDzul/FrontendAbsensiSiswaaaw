@@ -70,21 +70,14 @@ const avatarInitial = computed(() =>
 
 const filteredStudents = computed(() => {
   let list = students.value
-  // Filter berdasarkan kelas
   if (selectedClass.value) {
     list = list.filter(s => (s.class || '').trim() === selectedClass.value)
   }
-
-  // Filter berdasarkan Tab
   if (activeTab.value === 'hadir') {
-    // Menampilkan semua yang SUDAH memiliki status (Hadir/Izin/Sakit/Alfa)
-    list = list.filter(s => s.status && s.status.trim() !== '')
+    list = list.filter(s => ['hadir', 'izin', 'sakit', 'alfa'].includes(s.status?.toLowerCase()))
   } else if (activeTab.value === 'belum') {
-    // Menampilkan yang BELUM memiliki status sama sekali
-    list = list.filter(s => !s.status || s.status.trim() === '')
+    list = list.filter(s => !s.status)
   }
-
-  // Filter berdasarkan Pencarian
   if (searchQuery.value) {
     const q = searchQuery.value.toLowerCase()
     list = list.filter(s =>
@@ -96,11 +89,7 @@ const filteredStudents = computed(() => {
 })
 
 const hadirCount = computed(() =>
-  // Menghitung jumlah siswa di kelas terpilih yang sudah mengisi absen (status ada)
-  students.value.filter(s => 
-    (s.class || '').trim() === selectedClass.value && 
-    (s.status && s.status.trim() !== '')
-  ).length
+  filteredStudents.value.filter(s => ['hadir', 'izin', 'sakit', 'alfa'].includes(s.status?.toLowerCase())).length
 )
 
 // ================= AI CAMERA LOGIC =================
@@ -377,7 +366,7 @@ onUnmounted(() => {
         <div class="col-5 p-3">
           <div class="stat-card-inner">
             <span class="d-block small text-white-50">TERDATA</span>
-            <h2 class="fw-black m-0 text-white">{{ hadirCount }}<small class="fs-6 opacity-50">/{{ students.filter(s => (s.class || '').trim() === selectedClass).length }}</small></h2>
+            <h2 class="fw-black m-0 text-white">{{ hadirCount }}<small class="fs-6 opacity-50">/{{ filteredStudents.length }}</small></h2>
           </div>
         </div>
       </div>
@@ -436,14 +425,13 @@ onUnmounted(() => {
               </div>
               <div class="d-flex flex-column align-items-end gap-1">
                 <span :class="['status-tag', 
-                  s.status?.toLowerCase().includes('hadir') || s.status?.toLowerCase() === 'hadir' ? 'tag-hadir' : 
+                  s.status?.toLowerCase().includes('hadir') ? 'tag-hadir' : 
                   s.status?.toLowerCase() === 'izin' ? 'tag-izin' :
                   s.status?.toLowerCase() === 'sakit' ? 'tag-sakit' :
                   s.status?.toLowerCase() === 'alfa' ? 'tag-alfa' : 'tag-pending']">
-                  <i :class="s.status ? (s.status.toLowerCase().includes('foto') || s.status.toLowerCase() === 'hadir' ? 'bi bi-check-circle-fill' : 'bi bi-info-circle-fill') : 'bi bi-clock'"></i>
-                  {{ s.status ? s.status : 'Belum Absen' }}
+                  <i :class="s.status ? 'bi bi-whatsapp' : 'bi bi-clock'"></i>
+                  {{ s.status ? 'Foto Kehadiran Terkirim' : 'Belum Absen' }}
                 </span>
-                
                 <span v-if="s.isDriveLink" class="badge bg-success-subtle text-success smaller p-1" style="font-size: 0.55rem;">
                    <i class="bi bi-google"></i> Foto Terkirim (Drive)
                 </span>
@@ -465,13 +453,13 @@ onUnmounted(() => {
             <div v-if="s.status" class="mt-2 pt-2 border-top-dashed d-flex flex-column gap-2">
                 <button @click="toggleHistory(s.nis)" class="btn-detail text-start">
                   <i class="bi bi-eye-fill me-1"></i>
-                  {{ showHistoryFor === s.nis ? 'Sembunyikan Detail' : (s.isDriveLink ? 'Lihat Waktu & Link Google Drive' : 'Lihat Waktu & Bukti') }}
+                  {{ showHistoryFor === s.nis ? 'Sembunyikan Detail' : (s.isDriveLink ? 'Lihat Waktu & Link Google Drive' : 'Lihat Waktu & Bukti Whatsapp') }}
                 </button>
                 
                 <div v-if="showHistoryFor === s.nis" class="detail-expanded p-2 bg-light rounded-3 border">
                   <div v-for="(h, idx) in s.attendanceHistory" :key="idx" class="text-primary smaller mb-2">
                     <i class="bi bi-stopwatch me-1"></i>
-                    {{ h.day }} • {{ h.time }} <span class="text-muted">({{ h.status }})</span>
+                    {{ h.day }} • {{ h.time }} <span class="text-muted">(Diterima via WA)</span>
                   </div>
 
                   <div v-if="s.evidenceUrl" class="mt-2">
@@ -490,8 +478,8 @@ onUnmounted(() => {
                     </div>
                   </div>
                   
-                  <div v-else-if="s.status.toLowerCase() === 'hadir' || s.status.toLowerCase().includes('kirim')" class="text-danger smaller py-2 text-center bg-white rounded border">
-                    <i class="bi bi-image-fill me-1"></i> Bukti foto belum tersedia.
+                  <div v-else class="text-danger smaller py-2 text-center bg-white rounded border">
+                    <i class="bi bi-image-fill me-1"></i> Siswa belum mengirimkan foto ke WhatsApp.
                   </div>
                 </div>
             </div>
