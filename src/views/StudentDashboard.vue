@@ -347,7 +347,7 @@ const startScan = async () => {
       if (scanning) return
       if (text.startsWith(guruTokenPrefix)) {  
         scanning = true
-        qrVisible.value = false // Tutup scanner dulu
+        qrVisible.value = false 
         await submitAttendance(text)  
       } else { showToast('QR Code tidak valid!', 'error') }
     })
@@ -360,24 +360,26 @@ const stopScan = async () => {
 }
 
 const submitAttendance = async(token)=>{
-  isProcessingAbsen.value = true // Aktifkan Loading
+  isProcessingAbsen.value = true 
   try{
-    const now = new Date()
+    const now = new Date().toISOString()
     const currentMapel = jadwalHariIni.value.length > 0 ? jadwalHariIni.value[0].mapel : 'Pelajaran Umum'
     
-    // Simulasi delay biar kelihatan loadingnya
     await new Promise(r => setTimeout(r, 1500));
     
     await axios.post(`${backendUrl}/students/attendance/${student.value.nis}`, {  
-      status: 'Hadir', qrToken: token, mapel: currentMapel, timestamp: now.toISOString()  
+      status: 'Hadir', 
+      qrToken: token, 
+      mapel: currentMapel, 
+      timestamp: now  
     })
     
     student.value.status = 'Hadir'
-    student.value.lastAttendance = now.toISOString()
+    student.value.lastAttendance = now
     stopReminderSystem();  
     playSuccessFeedback();  
 
-    isProcessingAbsen.value = false // Matikan Loading
+    isProcessingAbsen.value = false 
     showToast('Absensi Berhasil!')
     setTimeout(() => { stopScan(); loadAttendance() }, 800)
   } catch(err){ 
@@ -397,13 +399,13 @@ const handleLogPulang = async () => {
   if (!confirm('Apakah Anda yakin ingin pulang?')) return;
 
   try {
-    const now = new Date();
+    const now = new Date().toISOString();
     await axios.post(`${backendUrl}/students/attendance/pulang/${student.value.nis}`, {
-      timestamp: now.toISOString()
+      timestamp: now
     });
 
     student.value.status = 'Pulang';
-    student.value.lastPulang = now.toISOString();
+    student.value.lastPulang = now;
     stopReminderSystem();
     
     showToast('Log Pulang Berhasil! Hati-hati di jalan.', 'success');
