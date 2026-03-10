@@ -32,7 +32,8 @@ const student = ref({
   class:'', 
   status:'Belum Absen', 
   lastAttendance: null,
-  gender: '' 
+  gender: '',
+  attendanceHistory: []
 })
 const attendanceStats = ref({ hadir: 0, sakit: 0, izin: 0, alfa: 0 }) 
 const qrVisible = ref(false)
@@ -68,11 +69,41 @@ const isLate = computed(() => {
   return currentMinutes > 450
 })
 
+// MENDAPATKAN MAPEL YANG AKTIF SAAT INI
+const activeMapelNow = computed(() => {
+  if (jadwalHariIni.value.length === 0) return null;
+  const currentMinutes = getCurrentTimeMinutes();
+  
+  return jadwalHariIni.value.find(j => {
+    const [startTime, endTime] = j.jam.split('-');
+    const [startHour, startMin] = startTime.split(':').map(Number);
+    const [endHour, endMin] = endTime ? endTime.split(':').map(Number) : [startHour + 1, startMin];
+    
+    const startTotal = startHour * 60 + startMin;
+    const endTotal = endHour * 60 + endMin;
+    
+    return currentMinutes >= startTotal && currentMinutes <= endTotal;
+  });
+});
+
+// LOGIKA BISA ABSEN (BERDASARKAN MAPEL)
 const canAbsen = computed(() => {
-  if (!isSchoolTime.value) return false
-  if (student.value.status === 'Hadir') return false
-  return true
-})
+  if (!isSchoolTime.value) return false;
+  
+  const currentMapel = activeMapelNow.value;
+  if (!currentMapel) return false; // Tidak ada mapel berlangsung
+
+  // Cek apakah Mapel ini sudah di-absen hari ini
+  const todayStr = new Date().toDateString();
+  const alreadyDone = student.value.attendanceHistory?.some(h => {
+    const isToday = new Date(h.timestamp).toDateString() === todayStr;
+    const isSameMapel = h.mapel === currentMapel.mapel;
+    const isHadir = h.status.toLowerCase() === 'hadir';
+    return isToday && isSameMapel && isHadir;
+  });
+
+  return !alreadyDone;
+});
 
 // ================= LOGIKA KIRIM BUKTI (WHATSAPP REDIRECT) =================
 const isUploading = ref(false)
@@ -81,7 +112,7 @@ const handleSendEvidenceDirect = () => {
   const phoneNumber = '6281322233928'
   const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
   const dateStr = new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-  const statusText = isLate.value ? 'Telat' : 'Hadir'
+  const statusText = isLate.value ? 'Hadir' : 'Hadir'
 
   const message = `Halo Bapak Ibu , saya ingin melaporkan kehadiran:%0A%0A` +
                   `*Nama:* ${student.value.name}%0A` +
@@ -326,26 +357,32 @@ const loadAttendance = async ()=>{
       student.value.name = me.name
       student.value.class = me.class
       student.value.gender = me.gender || ''
+      student.value.attendanceHistory = me.attendanceHistory || []
       
-      // Cek status berdasarkan jadwal mata pelajaran hari ini
       const today = new Date().toDateString();
-      const todayAbsensi = me.attendanceHistory?.filter(h => 
-        new Date(h.timestamp).toDateString() === today
-      ) || [];
-      
-      // Reset status setiap pagi
-      if (getCurrentTimeMinutes() < 360) { // Sebelum jam 6 pagi
+      const currentMapel = activeMapelNow.value;
+
+      // Reset status berdasarkan jam Mapel saat ini
+      if (getCurrentTimeMinutes() < 360) { 
         student.value.status = 'Belum Absen';
         student.value.lastAttendance = null;
-      } else if (todayAbsensi.length > 0) {
-        // Sudah absen mata pelajaran hari ini
-        student.value.status = 'Hadir';
-        student.value.lastAttendance = todayAbsensi[todayAbsensi.length - 1].timestamp;
+      } else if (currentMapel) {
+        // Cek riwayat absen mapel spesifik
+        const mapelAbsen = me.attendanceHistory?.find(h => 
+          new Date(h.timestamp).toDateString() === today && h.mapel === currentMapel.mapel
+        );
+        
+        if (mapelAbsen) {
+          student.value.status = 'Hadir';
+          student.value.lastAttendance = mapelAbsen.timestamp;
+        } else {
+          student.value.status = 'Belum Absen';
+        }
       } else {
         student.value.status = 'Belum Absen';
       }
 
-      // Update Stats
+      // Hitung Statistik (Mendukung Hadir, Sakit, Izin, Alfa)
       if(me.attendanceHistory) {
         const stats = { hadir: 0, sakit: 0, izin: 0, alfa: 0 }
         me.attendanceHistory.forEach(h => {
@@ -372,7 +409,10 @@ const startScan = async () => {
     if (!isSchoolTime.value) {
       return showToast('Absensi hanya bisa dilakukan jam 06:00 - 15:00.', 'error')
     }
-    return showToast('Kamu sudah absen mata pelajaran hari ini!', 'info')
+    const currentMapel = activeMapelNow.value;
+    if (!currentMapel) return showToast('Tidak ada jadwal pelajaran saat ini.', 'info')
+    
+    return showToast(`Kamu sudah absen Mapel ${currentMapel.mapel} hari ini!`, 'info')
   }
   
   showToast('Cek Lokasi...', 'info')
@@ -403,16 +443,8 @@ const submitAttendance = async(token)=>{
   isProcessingAbsen.value = true 
   try{
     const now = new Date().toISOString()
-    const currentMapel = jadwalHariIni.value.find(j => {
-      const [startHour, startMin] = j.jam.split(':').map(Number)
-      const [endHour, endMin] = j.jam.split('-')[1]?.split(':').map(Number) || [startHour+1, startMin]
-      const currentMinutes = getCurrentTimeMinutes()
-      const startMinutes = startHour * 60 + startMin
-      const endMinutes = endHour * 60 + endMin
-      return currentMinutes >= startMinutes && currentMinutes <= endMinutes
-    })?.mapel || jadwalHariIni.value[0]?.mapel || 'Pelajaran Umum'
-    
-    const status = isLate.value ? 'Telat' : 'Hadir'
+    const currentMapel = activeMapelNow.value?.mapel || 'Pelajaran Umum'
+    const status = 'Hadir'
     
     await new Promise(r => setTimeout(r, 1500));
     
@@ -429,7 +461,7 @@ const submitAttendance = async(token)=>{
     playSuccessFeedback(); 
 
     isProcessingAbsen.value = false 
-    showToast(`Absensi ${status} ${currentMapel} berhasil!`)
+    showToast(`Absensi Berhasil: ${currentMapel}`)
     setTimeout(() => { stopScan(); loadAttendance() }, 800)
   } catch(err){ 
     isProcessingAbsen.value = false
@@ -440,8 +472,9 @@ const submitAttendance = async(token)=>{
 
 const displayStatus = computed(() => {
   if(student.value.status === 'Hadir' && student.value.lastAttendance){
-    const statusText = isLate.value ? 'Telat' : 'Hadir'
-    return `${statusText} - ${new Date(student.value.lastAttendance).toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' })}`
+    const timeStr = new Date(student.value.lastAttendance).toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' });
+    const mapelName = activeMapelNow.value?.mapel || '';
+    return isLate.value ? `Hadir (Telat) - ${timeStr}` : `Hadir - ${timeStr}`;
   }
   if (!isSchoolTime.value) {
     return 'Di luar jam sekolah'
@@ -473,8 +506,9 @@ onMounted(async () => {
   const savedImg = localStorage.getItem(`profile_img_${savedNis}`)
   if(savedImg) profileImage.value = savedImg
 
+  await fetchJadwalFromAdmin()
   await loadAttendance()
-  await Promise.all([loadGpsConfig(), fetchJadwalFromAdmin()])
+  await loadGpsConfig()
   
   const interval = setInterval(loadAttendance, 30000) 
   
@@ -583,10 +617,9 @@ onUnmounted(()=>{
 
   <main class="container px-4 mt-4">
     <section class="status-card shadow-sm mb-4" :class="{
-      'status-active': student.status === 'Hadir' && !isLate,
-      'status-late': student.status === 'Hadir' && isLate,
-      'status-pulang': !isSchoolTime,
-      'status-pending': student.status === 'Belum Absen'
+      'status-active': student.status === 'Hadir',
+      'status-pulang': !isSchoolTime && student.status !== 'Hadir',
+      'status-pending': student.status === 'Belum Absen' && isSchoolTime
     }">
       <div class="card-body p-4 text-white">
         <div class="d-flex justify-content-between opacity-75 small mb-2"><span>STATUS KEHADIRAN</span><i class="bi bi-shield-check"></i></div>
@@ -764,7 +797,6 @@ onUnmounted(()=>{
   transition: all 0.4s ease;
   border: none;
 }
-
 
 .status-active {
   background: linear-gradient(135deg, #10b981 0%, #059669 100%); /* Hijau */
