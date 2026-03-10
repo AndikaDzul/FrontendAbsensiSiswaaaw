@@ -23,9 +23,7 @@ import KamisImg from '../Kamis.jpg'
 import jumatImg from '../jumat.jpg'
 
 const router = useRouter()
-const backendUrl = 'https://backend-complited.vercel.app'
-const apiUrl = 'https://project-backend-beres-5z94.vercel.app/api'
-
+const backendUrl = 'https://project-backend-beres-5z94.vercel.app/api'
 
 // ================= STATE SISWA & UI =================
 const student = ref({ 
@@ -819,7 +817,6 @@ onUnmounted(()=> {
 .btn-primary-custom { background: #007bff; color: white; border: none; border-radius: 15px; font-weight: bold; }
 .action-card { background: white; border: 1px solid #eee; border-radius: 20px; transition: transform 0.2s; }
 .action-card:active { transform: scale(0.95); }
-.disabled-card { opacity: 0.6; grayscale: 1; cursor: not-allowed; }
 /* STATISTIK */
 .stat-card { padding: 12px 5px; border-radius: 16px; text-align: center; display: flex; flex-direction: column; transition: 0.3s; border: 1px solid rgba(0,0,0,0.05); }
 .stat-val { font-size: 1.2rem; font-weight: 800; display: block; }
