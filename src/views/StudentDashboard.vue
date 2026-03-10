@@ -421,13 +421,8 @@ const submitAttendance = async(token)=>{
   }
 }
 
-// ================= LOGIKA LOG PULANG =================
+// ================= LOGIKA LOG PULANG (HAPUS PEMBATASAN) =================
 const handleLogPulang = async () => {
-  if (student.value.status === 'Pulang') {
-    showToast('Anda sudah pulang hari ini, tunggu besok pagi hari jika ingin absen kembali!.', 'info');
-    return;
-  }
-
   if (!confirm('Apakah Anda sudah pulang?')) return;
 
   try {
@@ -631,7 +626,7 @@ onUnmounted(()=> {
 
     <div class="row g-3 mb-4">
       <div class="col-6">
-        <button class="action-card btn btn-white w-100 py-4 shadow-sm" @click="handleLogPulang" :disabled="student.status === 'Pulang'">
+        <button class="action-card btn btn-white w-100 py-4 shadow-sm" @click="handleLogPulang">
           <i class="bi bi-house-door d-block mb-2 fs-2 text-warning"></i>
           <span class="fw-bold small">LOG PULANG</span>
         </button>
@@ -772,7 +767,7 @@ onUnmounted(()=> {
           </div>
           <div v-if="jadwalHariIni.length === 0" class="text-center py-5"><i class="bi bi-calendar2-x fs-1 text-light mb-3 d-block"></i><p class="text-muted small">Tidak ada jadwal hari ini.</p></div>
         </div>
-        <button @click="scheduleVisible=false" class="btn btn-primary-custom w-100 py-3 rounded-pill mt-3">Tutup</button>
+        <button @click="scheduleVisible=false" class="btn btn-light w-100 py-3 rounded-pill fw-bold mt-2">Tutup</button>
       </div>
     </div>
   </transition>
