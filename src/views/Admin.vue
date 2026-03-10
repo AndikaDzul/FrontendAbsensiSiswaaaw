@@ -347,6 +347,18 @@
             </div>
             <div class="export-controls-formal">
               <div class="filter-group-formal">
+                <label>Pilih Bulan</label>
+                <select v-model="selectedExportMonth" class="formal-select">
+                  <option v-for="(m, idx) in namaBulanList" :key="idx" :value="idx">{{ m }}</option>
+                </select>
+              </div>
+              <div class="filter-group-formal">
+                <label>Pilih Tahun</label>
+                <select v-model="selectedExportYear" class="formal-select">
+                  <option v-for="y in [2025, 2026, 2027]" :key="y" :value="y">{{ y }}</option>
+                </select>
+              </div>
+              <div class="filter-group-formal">
                 <label>Tingkat</label>
                 <select v-model="selectedExportTingkat" class="formal-select">
                   <option value="">Semua Tingkat</option>
@@ -367,13 +379,7 @@
                   <option v-for="n in nomorKelasList" :key="n" :value="n">{{ n }}</option>
                 </select>
               </div>
-              <div class="filter-group-formal">
-                <label>Filter Periode Hari</label>
-                <select v-model="selectedExportDay" class="formal-select">
-                  <option value="">Semua Hari Kerja</option>
-                  <option v-for="h in filteredHariList" :key="h" :value="h">{{ h }}</option>
-                </select>
-              </div>
+              
               <button class="btn-formal-export" @click="exportToExcel">
                 <i class="bi bi-file-earmark-excel"></i> Cetak ke Excel (XLSX)
               </button>
@@ -447,6 +453,11 @@ const selectedExportTingkat = ref('')
 const selectedExportJurusan = ref('') 
 const selectedExportNomor = ref('')
 
+// NEW: Month and Year Filters (Default to current)
+const now = new Date()
+const selectedExportMonth = ref(now.getMonth()) 
+const selectedExportYear = ref(now.getFullYear())
+
 // Schedule Filters
 const selectedJadwalJurusan = ref('')
 const selectedJadwalTingkat = ref('')
@@ -458,6 +469,7 @@ const tingkatList = ['X', 'XI', 'XII']
 const nomorKelasList = ['1', '2', '3', '4', '5']
 const hariList = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu']
 const filteredHariList = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat']
+const namaBulanList = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
 
 const siswa = ref([])
 const guru = ref([])
@@ -521,7 +533,7 @@ const filteredSiswaReport = computed(() => {
 
 const formatAttendanceForTable = (student) => {
   const result = []
-  const daysToProcess = selectedExportDay.value ? [selectedExportDay.value] : filteredHariList
+  const daysToProcess = filteredHariList 
 
   daysToProcess.forEach(dayName => {
     const jadwalHariSiswa = jadwal.value.filter(j => 
@@ -532,44 +544,27 @@ const formatAttendanceForTable = (student) => {
     if (jadwalHariSiswa.length > 0) {
       jadwalHariSiswa.forEach((j, index) => {
         const record = student.attendanceHistory?.find(h => {
+          const dateObj = h.timestamp?.$date ? new Date(h.timestamp.$date) : new Date(h.timestamp)
+          const isMonthMatch = dateObj.getMonth() === selectedExportMonth.value
+          const isYearMatch = dateObj.getFullYear() === selectedExportYear.value
           const isMapelMatch = h.mapel?.toLowerCase() === j.mapel.toLowerCase()
+          
           let isDayMatch = false
           if (h.day) {
             isDayMatch = h.day === dayName
           } else {
-            const dateObj = h.timestamp?.$date ? new Date(h.timestamp.$date) : new Date(h.timestamp)
             isDayMatch = hariList[dateObj.getDay()] === dayName
           }
-          return isDayMatch && isMapelMatch
+          return isDayMatch && isMapelMatch && isMonthMatch && isYearMatch
         })
-
-        const dayRecords = student.attendanceHistory?.filter(h => {
-          const d = h.timestamp?.$date ? new Date(h.timestamp.$date) : new Date(h.timestamp)
-          return hariList[d.getDay()] === dayName
-        }) || []
-
-        const finalMatch = record || dayRecords[index]
 
         result.push({
           day: dayName,
           jam: j.jam,
           mapel: j.mapel,
-          guru: j.guru,
-          status: finalMatch ? (finalMatch.status || 'Hadir') : 'Alfa',
-          jamScan: finalMatch ? new Date(finalMatch.timestamp?.$date || finalMatch.timestamp).toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'}) : '-'
+          status: record ? (record.status || 'Hadir') : 'Alfa',
         })
       })
-    } else {
-      if (selectedExportDay.value === dayName || !selectedExportDay.value) {
-          result.push({
-            day: dayName,
-            jam: "N/A",
-            mapel: "Belum Diatur",
-            guru: "-",
-            status: student.status || 'Alfa',
-            jamScan: "-"
-          })
-      }
     }
   })
   return result
@@ -650,47 +645,85 @@ const statusIcon = status => {
 }
 
 const exportToExcel = () => {
-  const now = new Date()
-  const dateStr = now.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-  
-  const targetTingkat = selectedExportTingkat.value || 'Semua'
-  const targetJurusan = selectedExportJurusan.value || 'Semua Jurusan'
-  const targetNo = selectedExportNomor.value ? ` No ${selectedExportNomor.value}` : ''
+  const year = selectedExportYear.value;
+  const month = selectedExportMonth.value;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const periodStr = `${namaBulanList[month]} ${year}`;
+  const targetTingkat = selectedExportTingkat.value || 'Semua';
+  const targetJurusan = selectedExportJurusan.value || 'Semua Jurusan';
 
-  const headerInfo = [
-    ["LAPORAN KEHADIRAN SISWA ZIE SEN"],
-    ["---------------------------------------------------"],
+  // Header Row 1: Info Dasar
+  const infoHeader = [
+    ["LAPORAN ABSENSI SISWA ZIESEN"],
     ["Unit Kerja", ": SMK Negeri 1 (ZieSen System)"],
-    ["Tingkat", ": " + targetTingkat],
-    ["Filter Jurusan", ": " + targetJurusan + targetNo],
-    ["Waktu Cetak", ": " + dateStr],
-    [""],
-    ["NIS", "NAMA LENGKAP", "KELAS", "STATUS KEHADIRAN"]
-  ]
+    ["Periode", ": " + periodStr],
+    ["Tingkat/Jurusan", ": " + targetTingkat + " " + targetJurusan],
+    [""], // Spacer
+  ];
 
-  const sourceData = filteredSiswaReport.value
-  const dataRows = sourceData.map(s => {
-    return [
-      s.nis, 
-      s.name, 
-      s.class, 
-      s.status || 'Alfa'
-    ]
-  })
+  // Table Columns Header
+  const dateHeaders = [];
+  for (let d = 1; d <= daysInMonth; d++) {
+    dateHeaders.push(d);
+  }
+  const tableHeader = ["NIS", "NAMA LENGKAP", "KELAS", ...dateHeaders];
 
-  const fullData = [...headerInfo, ...dataRows]
-  const ws = XLSX.utils.aoa_to_sheet(fullData); 
-  const wb = XLSX.utils.book_new()
+  const dataRows = [];
+  filteredSiswaReport.value.forEach(student => {
+    const row = [student.nis, student.name, student.class];
+    
+    // Check status for each day in the month
+    for (let day = 1; day <= daysInMonth; day++) {
+      const currentDate = new Date(year, month, day);
+      const dayName = hariList[currentDate.getDay()];
 
-  ws['!cols'] = [
+      // Logic: Jika hari Minggu, tulis 'Minggu'
+      if (dayName === 'Minggu') {
+        row.push("Minggu");
+        continue;
+      }
+
+      // Cari di attendanceHistory apakah ada record di tanggal ini
+      const record = student.attendanceHistory?.find(h => {
+        const hDate = h.timestamp?.$date ? new Date(h.timestamp.$date) : new Date(h.timestamp);
+        return hDate.getDate() === day && hDate.getMonth() === month && hDate.getFullYear() === year;
+      });
+
+      if (record) {
+        // Ambil inisial status
+        const s = record.status || 'Hadir';
+        if (s === 'Hadir') row.push('H');
+        else if (s === 'Sakit') row.push('S');
+        else if (s === 'Izin') row.push('I');
+        else row.push('A');
+      } else {
+        // Jika tidak ada record dan bukan minggu, anggap belum absen/Alfa
+        // Untuk hari Sabtu/Minggu yang tidak sekolah bisa dikosongkan jika perlu, 
+        // tapi sesuai instruksi kita tampilkan status.
+        row.push('A');
+      }
+    }
+    dataRows.push(row);
+  });
+
+  const fullData = [...infoHeader, tableHeader, ...dataRows];
+  const ws = XLSX.utils.aoa_to_sheet(fullData);
+  const wb = XLSX.utils.book_new();
+
+  // Atur Lebar Kolom agar tidak terpotong
+  const colWidths = [
     { wch: 15 }, // NIS
-    { wch: 40 }, // NAMA
-    { wch: 20 }, // KELAS
-    { wch: 20 }  // STATUS
-  ]
+    { wch: 30 }, // NAMA
+    { wch: 12 }, // KELAS
+  ];
+  // Lebar kolom tanggal (kecil saja)
+  for (let i = 0; i < daysInMonth; i++) {
+    colWidths.push({ wch: 4 });
+  }
+  ws['!cols'] = colWidths;
 
-  XLSX.utils.book_append_sheet(wb, ws, "Rekap_ZieSen"); 
-  XLSX.writeFile(wb, `Laporan_ZieSen_${targetTingkat}_${targetJurusan}${targetNo}.xlsx`)
+  XLSX.utils.book_append_sheet(wb, ws, "Laporan_Absensi");
+  XLSX.writeFile(wb, `Laporan_ZieSen_${periodStr}.xlsx`);
 }
 
 const logout = () => { localStorage.clear(); router.push('/login') }
