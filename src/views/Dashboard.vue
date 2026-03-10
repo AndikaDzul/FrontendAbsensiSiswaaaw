@@ -6,6 +6,7 @@ import axios from 'axios'
 
 const router = useRouter()
 const backendUrl = 'https://backend-complited.vercel.app'
+const apiUrl = 'https://project-backend-beres-5z94.vercel.app/api'
 
 // ================= STATE =================
 const user = ref({ name:'', role:'guru', mapel:'' })
