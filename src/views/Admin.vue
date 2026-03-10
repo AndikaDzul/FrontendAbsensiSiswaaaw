@@ -500,7 +500,7 @@ const selectedJadwalTingkat = ref('')
 
 const admin = ref({ name: localStorage.getItem('adminName') || 'Admin' })
 
-const jurusanList = ['RPL', 'AKL', 'PS', 'TJKT', 'MPLB']
+const jurusanList = ['RPL', 'PPLG-RPL', 'AKKUL', 'AKKUL-AK', 'AKKUL-PB', 'PS', 'PS-BR', 'PPLG','BD-PS', 'MPLB-MP', 'MPLB-ML','TJKT', 'TJKT-TK', 'MPLB' ]
 const tingkatList = ['X', 'XI', 'XII']
 const nomorKelasList = ['1', '2', '3', '4', '5']
 const hariList = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu']
