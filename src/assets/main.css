@@ -21,6 +21,15 @@ body {
   background: var(--bg-main);
   min-height: 100vh;
   color: var(--text-primary);
+  user-select: none; /* Anti-copy / App feel */
+  touch-action: pan-y; /* Prevent accidental zoom gestures */
+  -webkit-tap-highlight-color: transparent; /* Remove gray tap highlight */
+  overflow-x: hidden;
+}
+
+/* Prevent zoom on input focus for iOS */
+input, select, textarea {
+  font-size: 16px !important;
 }
 
 /* LAYOUT STRUCTURE */

@@ -23,7 +23,7 @@ import KamisImg from '../Kamis.jpg'
 import jumatImg from '../jumat.jpg'
 
 const router = useRouter()
-const backendUrl = 'https://backendd-andika-beres.vercel.app/api'
+const backendUrl = 'http://localhost:3000/api'
 
 // ================= STATE SISWA & UI =================
 const student = ref({ 
@@ -518,6 +518,17 @@ const buyVoucher = async (itemType = 'generic') => {
   claimingVoucher.value = false;
 }
 
+const clearPointHistory = async () => {
+  if (!confirm('Apakah Anda yakin ingin menghapus semua riwayat point? Tindakan ini tidak dapat dibatalkan.')) return
+  try {
+    await axios.delete(`${backendUrl}/students/${student.value.nis}/point-history`)
+    showToast('Riwayat berhasil dihapus', 'success')
+    loadAttendance()
+  } catch (err) {
+    showToast('Gagal menghapus riwayat', 'error')
+  }
+}
+
 const hariIniText = computed(()=> new Date().toLocaleDateString('id-ID', { weekday: 'long' }))
 
 const confirmLogout = () => { showLogoutConfirm.value = true }
@@ -688,9 +699,16 @@ onUnmounted(()=>{
     <!-- NEW POINT SISWA BUTTON ROW -->
     <div class="row g-3 mb-3">
       <div class="col-12">
-        <button class="action-card btn btn-white w-100 py-4 shadow-sm bg-white" @click="pointVisible = true">
-          <i class="bi bi-star-fill d-block mb-2 fs-2 text-warning"></i>
-          <span class="fw-bold small">POINT SISWA ({{ student.points || 0 }})</span>
+        <button class="action-card btn btn-white w-100 py-4 shadow-sm bg-white" @click="pointVisible = true" style="background: linear-gradient(135deg, #ffffff 0%, #fffbeb 100%);">
+          <div class="d-flex align-items-center justify-content-center gap-3">
+            <div class="p-2 rounded-circle bg-warning bg-opacity-10">
+              <i class="bi bi-star-fill fs-2 text-warning"></i>
+            </div>
+            <div class="text-start">
+              <span class="fw-bold d-block text-dark" style="font-size: 1.1rem;">POINT SISWA SMKN 1 CIANJUR</span>
+              <span class="badge bg-warning text-dark px-3 rounded-pill fw-bold" style="font-size: 0.9rem;">{{ student.points || 0 }} PT</span>
+            </div>
+          </div>
         </button>
       </div>
     </div>
@@ -739,32 +757,54 @@ onUnmounted(()=>{
         <div class="drag-handle mb-0" style="padding-top: 12px;"></div>
 
         <!-- Hero Profile Header -->
-        <div class="profile-hero-header px-4 pb-4 pt-3" style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 60%, #06b6d4 100%); border-radius: 0; flex-shrink: 0;">
+        <div class="profile-hero-header px-4 pb-4 pt-4" style="background: linear-gradient(135deg, #4f46e5 0%, #6366f1 60%, #818cf8 100%); border-radius: 0; flex-shrink: 0;">
           <div class="d-flex justify-content-between align-items-start mb-3">
             <span class="badge" style="background: rgba(255,255,255,0.2); color: white; font-size: 0.7rem; border-radius: 20px; padding: 5px 12px; backdrop-filter: blur(10px);">PROFIL SISWA</span>
             <button @click="profileVisible = false" class="btn btn-sm" style="background: rgba(255,255,255,0.2); color: white; border: none; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">
               <i class="bi bi-x-lg" style="font-size: 0.9rem;"></i>
             </button>
           </div>
-          <div class="d-flex align-items-center gap-3">
+          <div class="d-flex align-items-center gap-3 mb-4">
             <div class="position-relative">
-              <div class="profile-avatar-large shadow" style="border: 3px solid rgba(255,255,255,0.5);">
+              <div class="profile-avatar-large shadow" style="border: 3px solid rgba(255,255,255,0.5); width: 80px; height: 80px; border-radius: 28px; overflow: hidden; background: white; display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: 800; color: #4f46e5;">
                 <img v-if="profileImage" :src="profileImage" class="w-100 h-100 object-fit-cover">
-                <span v-else style="color: white;">{{ student.name?.charAt(0).toUpperCase() }}</span>
+                <span v-else>{{ student.name?.charAt(0).toUpperCase() }}</span>
               </div>
-              <label class="position-absolute" style="bottom: -2px; right: -2px; background: white; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.2);">
-                <i class="bi bi-camera-fill text-primary" style="font-size: 0.8rem;"></i>
+              <label class="position-absolute" style="bottom: -5px; right: -5px; background: white; border-radius: 12px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.2); border: 2px solid #6366f1;">
+                <i class="bi bi-camera-fill text-primary" style="font-size: 0.9rem;"></i>
                 <input type="file" @change="handleImageUpload" class="d-none" accept="image/*">
               </label>
             </div>
-            <div>
-              <h5 class="fw-bold mb-1" style="color: white;">{{ student.name }}</h5>
-              <div class="d-flex gap-2 flex-wrap">
-                <span class="badge" style="background: rgba(255,255,255,0.2); color: white; font-size: 0.7rem; border-radius: 10px;"><i class="bi bi-person-badge me-1"></i>{{ student.nis }}</span>
-                <span class="badge" style="background: rgba(255,255,255,0.2); color: white; font-size: 0.7rem; border-radius: 10px;"><i class="bi bi-building me-1"></i>{{ student.class }}</span>
-                <span class="badge" style="background: rgba(255,255,255,0.2); color: white; font-size: 0.7rem; border-radius: 10px;"><i class="bi bi-gender-ambiguous me-1"></i>{{ genderDetect }}</span>
+            <div class="flex-grow-1">
+              <h5 class="fw-bold mb-1" style="color: white; font-size: 1.25rem;">{{ student.name }}</h5>
+              <div class="d-flex gap-2 flex-wrap mb-2">
+                <span class="badge" style="background: rgba(255,255,255,0.2); color: white; font-size: 0.65rem; border-radius: 8px;"><i class="bi bi-person-badge me-1"></i>{{ student.nis }}</span>
+                <span class="badge" style="background: rgba(255,255,255,0.2); color: white; font-size: 0.65rem; border-radius: 8px;"><i class="bi bi-building me-1"></i>{{ student.class }}</span>
               </div>
             </div>
+          </div>
+
+          <!-- Wallet Section Inside Profile -->
+          <div class="profile-wallet-card p-3 shadow-lg" style="background: white; border-radius: 24px; display: flex; align-items: center; justify-content: space-between;">
+            <div @click="profileVisible = false; pointVisible = true" style="cursor: pointer;">
+              <small class="text-muted fw-bold d-block mb-1" style="font-size: 0.6rem; letter-spacing: 0.5px;">SALDO POINT</small>
+              <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-star-fill text-warning"></i>
+                <span class="fw-bold text-dark" style="font-size: 1.2rem;">{{ student.points || 0 }} <small class="text-muted" style="font-size: 0.8rem;">PT</small></span>
+              </div>
+            </div>
+            <div class="vr mx-3 opacity-10"></div>
+            <div class="flex-grow-1 d-flex gap-2">
+               <div class="text-center">
+                  <small class="text-muted d-block" style="font-size: 0.55rem;">MAPEL</small>
+                  <span class="badge bg-primary rounded-pill" style="font-size: 0.7rem;">{{ student.vouchersMapel || 0 }}</span>
+               </div>
+               <div class="text-center">
+                  <small class="text-muted d-block" style="font-size: 0.55rem;">ALFA</small>
+                  <span class="badge bg-danger rounded-pill" style="font-size: 0.7rem;">{{ student.vouchersAlfa || 0 }}</span>
+               </div>
+            </div>
+            <button @click="profileVisible = false; pointVisible = true" class="btn btn-sm btn-light rounded-pill px-3 fw-bold" style="font-size: 0.7rem; background: #f1f5f9;">MARKET <i class="bi bi-chevron-right"></i></button>
           </div>
         </div>
 
@@ -870,7 +910,7 @@ onUnmounted(()=>{
         
         <div class="px-4 pb-3">
           <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-star-fill text-warning me-2"></i>Point Kesantriaan</h5>
+            <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-star-fill text-warning me-2"></i>Point Siswa SMKN 1 Cianjur</h5>
             <button @click="pointVisible = false" class="btn btn-sm btn-light rounded-circle"><i class="bi bi-x-lg"></i></button>
           </div>
 
@@ -931,7 +971,7 @@ onUnmounted(()=>{
             </div>
             
             <div class="alert alert-info py-3 rounded-4 border-0 shadow-sm mb-4">
-               <h6 class="fw-bold mb-2"><i class="bi bi-info-circle-fill me-2"></i>Aturan Point Kesantriaan</h6>
+               <h6 class="fw-bold mb-2"><i class="bi bi-info-circle-fill me-2"></i>Aturan Point Siswa SMKN 1 Cianjur</h6>
                <ul class="list-unstyled mb-0 small" style="line-height: 1.6;">
                  <li class="d-flex justify-content-between">
                    <span><i class="bi bi-plus-circle text-success me-2"></i>Absen Berhasil:</span>
@@ -957,6 +997,13 @@ onUnmounted(()=>{
 
           <!-- HISTORY TAB -->
           <div v-if="activePointTab === 'history'">
+             <div class="d-flex justify-content-between align-items-center mb-3">
+               <h6 class="fw-bold small text-muted text-uppercase mb-0">Riwayat Poin</h6>
+               <button v-if="student.pointHistory && student.pointHistory.length > 0" @click="clearPointHistory" class="btn btn-sm btn-outline-danger py-1 px-3 rounded-pill fw-bold" style="font-size: 0.7rem;">
+                 <i class="bi bi-trash-fill me-1"></i> Hapus Riwayat
+               </button>
+             </div>
+             
              <div v-if="!student.pointHistory || student.pointHistory.length === 0" class="text-center py-5">
                 <i class="bi bi-clock-history text-muted fs-1 opacity-50"></i>
                 <p class="text-muted small mt-2">Belum ada riwayat transaksi</p>
@@ -1042,7 +1089,7 @@ onUnmounted(()=>{
         <p class="text-muted mb-4 px-3">Terima kasih sudah hadir tepat waktu. <strong>Point bertambah +28</strong> karena absen berhasil!</p>
         <div class="reward-pill mb-4 mx-auto">
           <i class="bi bi-star-fill text-warning me-2"></i>
-          <span class="fw-bold text-primary">+28 Point Kesantriaan</span>
+          <span class="fw-bold text-primary">+28 Point Siswa SMKN 1 Cianjur</span>
         </div>
         <button @click="showSuccessModal = false" class="btn btn-primary w-100 py-3 rounded-pill fw-bold shadow">KEMBALI KE BERANDA</button>
       </div>
@@ -1111,6 +1158,11 @@ onUnmounted(()=>{
 .status-alfa {
   background: linear-gradient(135deg, #dc3545 0%, #f8d7da 100%) !important;
   color: white !important;
+}
+
+/* Status Terlewat Mapel */
+.status-terlewat-mapel {
+  background: linear-gradient(135deg, #64748b 0%, #475569 100%) !important;
 }
 
 /* Status Belum Absen / Pending */

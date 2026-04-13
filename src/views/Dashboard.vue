@@ -6,8 +6,8 @@ import axios from 'axios'
 import Chart from 'chart.js/auto'
 
 const router = useRouter()
-const backendUrl = 'https://backendd-andika-beres.vercel.app/api'
-const apiUrl = 'https://project-backend-beres-5z94.vercel.app/api'
+const backendUrl = 'http://localhost:3000/api'
+const apiUrl = 'http://localhost:3000/api'
 
 // ================= STATE =================
 const user = ref({ name: '', role: 'guru', mapel: '' })
@@ -514,7 +514,8 @@ onMounted(async () => {
                     <span v-if="s.displayStatus !== 'Belum Absen'" :class="['badge rounded-pill smaller-badge', 
                       s.displayStatus === 'Hadir' ? 'bg-success-subtle text-success' : 
                       s.displayStatus === 'Sakit' ? 'bg-warning-subtle text-warning' : 
-                      s.displayStatus === 'Izin' ? 'bg-info-subtle text-info' : 'bg-danger-subtle text-danger']">
+                      s.displayStatus === 'Izin' ? 'bg-info-subtle text-info' : 
+                      s.displayStatus === 'Terlewat Mapel' ? 'bg-secondary-subtle text-secondary' : 'bg-danger-subtle text-danger']">
                       {{ s.displayStatus }}
                     </span>
                   </div>
@@ -525,7 +526,8 @@ onMounted(async () => {
                   <button @click="updateStatusManual(s.nis, 'Hadir')" class="btn btn-xs btn-outline-success py-0 px-2 fw-bold" title="Hadir">H</button>
                   <button @click="updateStatusManual(s.nis, 'Sakit')" class="btn btn-xs btn-outline-warning py-0 px-2 fw-bold" title="Sakit">S</button>
                   <button @click="updateStatusManual(s.nis, 'Izin')" class="btn btn-xs btn-outline-info py-0 px-2 fw-bold" title="Izin">I</button>
-                  <button @click="updateStatusManual(s.nis, 'Alpha')" class="btn btn-xs btn-outline-danger py-0 px-2 fw-bold" title="Alpha">A</button>
+                  <button @click="updateStatusManual(s.nis, 'Alpha')" class="btn btn-xs btn-outline-danger py-0 px-2 fw-bold" title="Alfa">A</button>
+                  <button @click="updateStatusManual(s.nis, 'Terlewat Mapel')" class="btn btn-xs btn-outline-secondary py-0 px-2 fw-bold" title="Terlewat Mapel">TM</button>
                 </div>
                 <button @click="openRatingModal(s)" class="btn btn-primary btn-sm rounded-pill px-3 py-1 smaller fw-bold shadow-sm">
                   <i class="bi bi-star-fill me-1"></i> NILAI
