@@ -366,6 +366,16 @@ const fetchTeacherProfile = async () => {
 }
 
 const updateStatusManual = async (nis, newStatus) => {
+  if (processingNis.value === nis) return
+  
+  // Optimistic Update
+  const originalStudents = JSON.parse(JSON.stringify(students.value))
+  const studentIndex = students.value.findIndex(s => s.nis === nis)
+  if (studentIndex !== -1) {
+    students.value[studentIndex].status = newStatus
+  }
+
+  processingNis.value = nis
   try {
     await axios.post(`${apiUrl}/students/absensi-manual`, {
       nis,
@@ -373,9 +383,14 @@ const updateStatusManual = async (nis, newStatus) => {
       teacherName: user.value.name
     })
     showToast(`Status: ${newStatus}`, 'success')
-    await loadStudents()
   } catch (e) {
+    // Revert on failure
+    students.value = originalStudents
     showToast('Gagal update status', 'error')
+  } finally {
+    processingNis.value = null
+    // Sync final state without blocking
+    loadStudents()
   }
 }
 

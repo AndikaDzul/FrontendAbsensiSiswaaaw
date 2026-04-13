@@ -516,23 +516,36 @@ const displayStatus = computed(() => {
 });
 
 const buyVoucher = async (itemType = 'generic') => {
-  claimingVoucher.value = true;
+  if (claimingVoucher.value) return
+  
   let cost = 25;
-  if(itemType === 'mapel') cost = 15;
-  if(itemType === 'alfa') cost = 22;
+  if(itemType === 'mapel') cost = 32;
+  if(itemType === 'alfa') cost = 44;
 
-  if ((student.value.points || 100) >= cost) {
-    try {
-      await axios.post(`${backendUrl}/students/${student.value.nis}/buy-voucher`, { cost, itemType })
-      showToast(`Berhasil membeli voucher!`, 'success');
-      loadAttendance();
-    } catch(err) {
-      showToast('Gagal memproses transaksi', 'error');
-    }
-  } else {
-    showToast(`Point tidak cukup! (butuh ${cost} point)`, 'error');
+  if ((student.value.points || 0) < cost) {
+    return showToast(`Point tidak cukup! (butuh ${cost} point)`, 'error');
   }
-  claimingVoucher.value = false;
+
+  // Optimistic Update
+  const originalStudent = JSON.parse(JSON.stringify(student.value))
+  student.value.points -= cost
+  if (itemType === 'mapel') student.value.vouchersMapel++
+  else if (itemType === 'alfa') student.value.vouchersAlfa++
+  else student.value.vouchers++
+
+  claimingVoucher.value = true;
+  try {
+    const res = await axios.post(`${backendUrl}/students/${student.value.nis}/buy-voucher`, { cost, itemType })
+    showToast(`Berhasil membeli voucher!`, 'success');
+    // Silent sync to ensure final state is correct
+    loadAttendance()
+  } catch(err) {
+    // Revert on error
+    student.value = originalStudent
+    showToast('Gagal memproses transaksi', 'error');
+  } finally {
+    claimingVoucher.value = false;
+  }
 }
 
 const clearPointHistory = async () => {
@@ -574,10 +587,22 @@ onMounted(async () => {
   const savedImg = localStorage.getItem(`profile_img_${savedNis}`)
   if(savedImg) profileImage.value = savedImg
 
-  await loadAttendance()
-  await Promise.all([loadGpsConfig(), fetchJadwalFromAdmin()])
-  const interval = setInterval(loadAttendance, 30000) 
-  onUnmounted(() => { clearInterval(interval); stopReminderSystem(); })
+  // Parallelized Initial Load
+  await Promise.all([
+    loadAttendance(),
+    loadGpsConfig(),
+    fetchJadwalFromAdmin()
+  ])
+
+  // Context-aware background sync
+  let interval = setInterval(() => {
+    if (document.visibilityState === 'visible') loadAttendance()
+  }, 30000) 
+  
+  onUnmounted(() => {
+    clearInterval(interval)
+    stopReminderSystem()
+  })
 })
 
 onUnmounted(()=>{
