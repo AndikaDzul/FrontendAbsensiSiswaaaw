@@ -160,7 +160,7 @@ watch(role, (newRole) => {
   }
 })
 
-const BACKEND = 'http://localhost:3000/api'
+const BACKEND = 'https://backendd-andika-beres.vercel.app/api'
 
 const handleLogin = async () => {
   error.value = ''

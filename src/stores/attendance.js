@@ -9,7 +9,7 @@ export const store = reactive({
   async fetchStudents() {
     this.loading = true
     try {
-      const res = await axios.get('http://localhost:3000/students')
+      const res = await axios.get('https://backendd-andika-beres.vercel.app/api/students')
       this.students = res.data
     } catch (err) {
       this.students = []
@@ -21,7 +21,7 @@ export const store = reactive({
   async markAttendance(nis) {
     try {
       // Update di backend
-      await axios.patch(`http://localhost:3000/students/nis/${nis}`, { status: 'Hadir' })
+      await axios.patch(`https://backendd-andika-beres.vercel.app/api/students/nis/${nis}`, { status: 'Hadir' })
 
       // Update store
       const s = this.students.find(st => st.nis === nis)

@@ -1,3 +1,3 @@
 export const config = {
-  baseUrl: 'http://localhost:3000', // ganti sesuai backend
+  baseUrl: 'https://backendd-andika-beres.vercel.app/api', // ganti sesuai backend
 }

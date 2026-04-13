@@ -7,7 +7,6 @@ import Chart from 'chart.js/auto'
 
 const router = useRouter()
 const backendUrl = 'https://backendd-andika-beres.vercel.app/api'
-const apiUrl = 'https://project-backend-beres-5z94.vercel.app/api'
 
 // ================= STATE =================
 const user = ref({ name: '', role: 'guru', mapel: '' })
