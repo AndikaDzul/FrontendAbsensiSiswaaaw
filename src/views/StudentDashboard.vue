@@ -270,15 +270,27 @@ const setMood = (mood) => {
   moodQuote.value = mood.type === 'sad' ? sadQuotes[Math.floor(Math.random() * sadQuotes.length)] : happyQuotes[Math.floor(Math.random() * happyQuotes.length)]
 }
 
-const handleImageUpload = (event) => {
+const handleImageUpload = async (event) => {
   const file = event.target.files[0]
-  if (file) {
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      profileImage.value = e.target.result
-      localStorage.setItem(`profile_img_${student.value.nis}`, e.target.result)
+  if (!file) return
+
+  const formData = new FormData()
+  formData.append('file', file)
+
+  showToast('Mengunggah foto...', 'info')
+  try {
+    const res = await axios.post(`${backendUrl}/students/${student.value.nis}/upload-profile`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    
+    if (res.data && res.data.profileImage) {
+      const baseUrl = backendUrl.replace('/api', '')
+      profileImage.value = `${baseUrl}/uploads/${res.data.profileImage}`
+      showToast('Foto profil diperbarui!', 'success')
     }
-    reader.readAsDataURL(file)
+  } catch (err) {
+    console.error('Upload error:', err)
+    showToast('Gagal mengunggah foto', 'error')
   }
 }
 
@@ -387,6 +399,11 @@ const loadAttendance = async ()=>{
       student.value.vouchersMapel = me.vouchersMapel !== undefined ? me.vouchersMapel : 0
       student.value.vouchersAlfa = me.vouchersAlfa !== undefined ? me.vouchersAlfa : 0
       student.value.pointHistory = me.pointHistory || []
+      
+      if (me.profileImage) {
+        const baseUrl = backendUrl.replace('/api', '')
+        profileImage.value = `${baseUrl}/uploads/${me.profileImage}`
+      }
       
       const today = new Date().toDateString();
       const currentMapel = getCurrentMapel();
@@ -501,8 +518,8 @@ const displayStatus = computed(() => {
 const buyVoucher = async (itemType = 'generic') => {
   claimingVoucher.value = true;
   let cost = 25;
-  if(itemType === 'mapel') cost = 32;
-  if(itemType === 'alfa') cost = 44;
+  if(itemType === 'mapel') cost = 15;
+  if(itemType === 'alfa') cost = 22;
 
   if ((student.value.points || 100) >= cost) {
     try {
@@ -944,7 +961,7 @@ onUnmounted(()=>{
                       </div>
                     </div>
                     <div class="text-end">
-                      <div class="badge bg-warning text-dark mb-1">32 Point</div>
+                      <div class="badge bg-warning text-dark mb-1">15 Point</div>
                       <div class="small fw-bold text-primary mt-1">Milik: {{ student.vouchersMapel || 0 }}</div>
                     </div>
                   </div>
@@ -962,7 +979,7 @@ onUnmounted(()=>{
                       </div>
                     </div>
                     <div class="text-end">
-                      <div class="badge bg-warning text-dark mb-1">44 Point</div>
+                      <div class="badge bg-warning text-dark mb-1">22 Point</div>
                       <div class="small fw-bold text-primary mt-1">Milik: {{ student.vouchersAlfa || 0 }}</div>
                     </div>
                   </div>
