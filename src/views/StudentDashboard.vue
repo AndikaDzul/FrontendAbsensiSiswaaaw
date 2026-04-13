@@ -23,8 +23,8 @@ import KamisImg from '../Kamis.jpg'
 import jumatImg from '../jumat.jpg'
 
 const router = useRouter()
-const backendUrl = 'http://localhost:3000/api'
-const apiUrl = 'http://localhost:3000/api'
+const backendUrl = 'https://backendd-andika-beres.vercel.app/api'
+const apiUrl = 'https://backendd-andika-beres.vercel.app/api'
 
 // ================= STATE SISWA & UI =================
 const student = ref({ 
