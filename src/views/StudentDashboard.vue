@@ -285,8 +285,12 @@ const handleImageUpload = async (event) => {
     })
     
     if (res.data && res.data.profileImage) {
-      const baseUrl = backendUrl.replace('/api', '')
-      profileImage.value = `${baseUrl}/uploads/${res.data.profileImage}`
+      if (res.data.profileImage.startsWith('data:image')) {
+        profileImage.value = res.data.profileImage
+      } else {
+        const baseUrl = backendUrl.replace('/api', '')
+        profileImage.value = `${baseUrl}/uploads/${res.data.profileImage}`
+      }
       showToast('Foto profil diperbarui!', 'success')
     }
   } catch (err) {
@@ -403,8 +407,12 @@ const loadAttendance = async ()=>{
       student.value.pointHistory = me.pointHistory || []
       
       if (me.profileImage) {
-        const baseUrl = backendUrl.replace('/api', '')
-        profileImage.value = `${baseUrl}/uploads/${me.profileImage}`
+        if (me.profileImage.startsWith('data:image')) {
+          profileImage.value = me.profileImage
+        } else {
+          const baseUrl = backendUrl.replace('/api', '')
+          profileImage.value = `${baseUrl}/uploads/${me.profileImage}`
+        }
       }
       
       const today = new Date().toDateString();
