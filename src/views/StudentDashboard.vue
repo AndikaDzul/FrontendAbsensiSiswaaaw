@@ -23,7 +23,8 @@ import KamisImg from '../Kamis.jpg'
 import jumatImg from '../jumat.jpg'
 
 const router = useRouter()
-const backendUrl = 'https://backendd-andika-beres.vercel.app/api'
+const backendUrl = 'http://localhost:3000/api'
+const apiUrl = 'http://localhost:3000/api'
 
 // ================= STATE SISWA & UI =================
 const student = ref({ 
@@ -289,8 +290,9 @@ const handleImageUpload = async (event) => {
       showToast('Foto profil diperbarui!', 'success')
     }
   } catch (err) {
-    console.error('Upload error:', err)
-    showToast('Gagal mengunggah foto', 'error')
+    console.error('Upload error details:', err)
+    const errorMsg = err.response?.data?.message || 'Gagal mengunggah foto'
+    showToast(errorMsg, 'error')
   }
 }
 
