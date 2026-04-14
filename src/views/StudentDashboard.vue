@@ -430,12 +430,18 @@ const fetchJadwalFromAdmin = async () => {
 const loadLeaderboard = async () => {
   isLeaderboardLoading.value = true
   try {
-    const res = await axios.get(`${backendUrl}/students`)
+    const res = await axios.get(`${backendUrl}/students/leaderboard`)
     const allStudents = res.data
     if (allStudents && allStudents.length > 0) {
-      leaderboard.value = allStudents.sort((a, b) => (b.points || 0) - (a.points || 0))
-    }
-  } catch(err) {
+      // Map only what's needed to avoid deep reactivity tracking of huge nested objects 
+      const simplified = allStudents.map(s => ({
+         nis: s.nis,
+         name: s.name,
+         class: s.class,
+         points: s.points || 0
+      }));
+      leaderboard.value = simplified.sort((a, b) => (b.points || 0) - (a.points || 0))
+    }  } catch(err) {
     console.error('Error load leaderboard:', err)
   } finally {
     isLeaderboardLoading.value = false
@@ -750,7 +756,7 @@ onMounted(async () => {
   // Context-aware background sync
   let interval = setInterval(() => {
     if (document.visibilityState === 'visible') loadAttendance()
-  }, 30000) 
+  }, 120000) // Diubah dari 30 detik agar tidak menyebabkan lag
   
   onUnmounted(() => {
     clearInterval(interval)

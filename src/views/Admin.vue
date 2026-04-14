@@ -1443,7 +1443,7 @@ onMounted(() => {
   loadGuru(); 
   loadJadwal(); 
   loadGpsFromServer(); 
-  setInterval(loadSiswa, 10000); 
+  setInterval(loadSiswa, 300000); // Diubah dari 10 detik ke 5 menit agar tidak lag
 })
 </script>
 
