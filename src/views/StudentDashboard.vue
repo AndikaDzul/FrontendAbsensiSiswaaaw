@@ -506,7 +506,8 @@ const startScan = async () => {
     await nextTick()
     if (html5QrCode) { try { await html5QrCode.stop() } catch (e) {} html5QrCode = null }
     html5QrCode = new Html5Qrcode("qr-reader")
-    await html5QrCode.start({ facingMode: "environment" }, { fps: 20, qrbox: 250 }, async (text) => {
+    const boxSize = Math.min(window.innerWidth, window.innerHeight) * 0.65
+    await html5QrCode.start({ facingMode: "environment" }, { fps: 20, qrbox: { width: boxSize, height: boxSize } }, async (text) => {
       if (scanning) return
       if (text.startsWith(guruTokenPrefix)) {  
         scanning = true
@@ -1255,14 +1256,49 @@ onUnmounted(()=>{
   </transition>
 
   <transition name="fade">
-    <div v-if="qrVisible" class="qr-overlay">
-      <div class="qr-container shadow-lg">
-        <div class="qr-header d-flex justify-content-between align-items-center p-3">
-          <h6 class="fw-bold m-0 text-white">SCAN QR GURU</h6>
-          <button @click="stopScan" class="btn-close btn-close-white"></button>
+    <div v-if="qrVisible" class="scanner-fullscreen">
+      <!-- Top Header -->
+      <div class="scanner-topbar d-flex justify-content-between align-items-center px-4 py-3">
+        <div class="d-flex align-items-center gap-2">
+          <div class="scanner-icon-badge">
+            <i class="bi bi-qr-code-scan"></i>
+          </div>
+          <div>
+            <h6 class="fw-bold mb-0 text-white" style="font-size: 0.95rem; letter-spacing: 0.5px;">SCAN QR GURU</h6>
+            <small class="text-white opacity-60" style="font-size: 0.7rem;">Arahkan ke QR Code Guru</small>
+          </div>
         </div>
-        <div id="qr-reader" class="qr-scanner"></div>
-        <div class="p-3 text-center text-white"><small><i class="bi bi-info-circle me-1"></i> Pastikan QR Code berada di dalam kotak</small></div>
+        <button @click="stopScan" class="scanner-close-btn">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </div>
+
+      <!-- Camera Body -->
+      <div class="scanner-body">
+        <div id="qr-reader"></div>
+
+        <!-- Overlay Frame -->
+        <div class="scan-overlay">
+          <div class="scan-frame">
+            <div class="corner t-l"></div>
+            <div class="corner t-r"></div>
+            <div class="corner b-l"></div>
+            <div class="corner b-r"></div>
+            <div class="scan-line"></div>
+          </div>
+          <p class="scan-hint-text mt-4">Arahkan kamera ke QR Code</p>
+        </div>
+      </div>
+
+      <!-- Bottom Info bar -->
+      <div class="scanner-bottom px-4 py-4 text-center">
+        <div class="scanner-bottom-pill">
+          <i class="bi bi-shield-check text-success me-2"></i>
+          <span>Absensi Aman & Terenkripsi</span>
+        </div>
+        <p class="text-white opacity-50 mt-3 mb-0" style="font-size: 0.72rem;">
+          <i class="bi bi-geo-alt-fill me-1"></i> GPS terverifikasi &bull; Scan otomatis saat terdeteksi
+        </p>
       </div>
     </div>
   </transition>
@@ -1648,20 +1684,161 @@ onUnmounted(()=>{
 .bg-primary-subtle { background-color: #e0e7ff !important; }
 .bg-danger-subtle { background-color: #fee2e2 !important; }
 
-/* SCANNER */
-.scanner-fullscreen { position:fixed; inset:0; background:#000; z-index:9999; display:flex; flex-direction:column; }
-.scanner-nav { z-index: 10; background: rgba(0,0,0,0.5); }
-.scanner-body { flex:1; position:relative; overflow: hidden; }
-#qr-reader { width: 100% !important; height: 100% !important; border: none !important; }
-.scan-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; z-index: 5; }
-.scan-frame { width: 260px; height: 260px; position: relative; }
-.corner { position: absolute; width: 30px; height: 30px; border: 4px solid #6366f1; }
-.t-l { top: 0; left: 0; border-right: none; border-bottom: none; border-radius: 15px 0 0 0; }
-.t-r { top: 0; right: 0; border-left: none; border-bottom: none; border-radius: 0 15px 0 0; }
-.b-l { bottom: 0; left: 0; border-right: none; border-top: none; border-radius: 0 0 0 15px; }
-.b-r { bottom: 0; right: 0; border-left: none; border-top: none; border-radius: 0 0 15px 0; }
-.scan-line { position: absolute; width: 100%; height: 2px; background: #6366f1; box-shadow: 0 0 15px #6366f1; animation: moveLine 2.5s infinite linear; }
-@keyframes moveLine { 0% { top: 0% } 50% { top: 100% } 100% { top: 0% } }
+/* SCANNER FULLSCREEN */
+.scanner-fullscreen {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.scanner-topbar {
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  z-index: 10;
+  flex-shrink: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: max(12px, env(safe-area-inset-top));
+}
+
+.scanner-icon-badge {
+  width: 38px;
+  height: 38px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  box-shadow: 0 4px 15px rgba(99, 102, 241, 0.5);
+}
+
+.scanner-close-btn {
+  width: 38px;
+  height: 38px;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.scanner-close-btn:hover { background: rgba(255,255,255,0.25); }
+
+.scanner-body {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: #000;
+}
+
+#qr-reader {
+  width: 100% !important;
+  height: 100% !important;
+  border: none !important;
+  background: #000 !important;
+}
+
+#qr-reader video {
+  object-fit: cover !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+#qr-reader img { display: none !important; }
+#qr-reader button { display: none !important; }
+#qr-reader select { display: none !important; }
+#qr-reader > div:not(:has(video)) { display: none !important; }
+
+.scan-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 5;
+  background: radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,0.6) 100%);
+}
+
+.scan-frame {
+  width: 260px;
+  height: 260px;
+  position: relative;
+}
+
+.corner {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  border: 4px solid #a78bfa;
+  filter: drop-shadow(0 0 8px rgba(167, 139, 250, 0.8));
+}
+.t-l { top: 0; left: 0; border-right: none; border-bottom: none; border-radius: 10px 0 0 0; }
+.t-r { top: 0; right: 0; border-left: none; border-bottom: none; border-radius: 0 10px 0 0; }
+.b-l { bottom: 0; left: 0; border-right: none; border-top: none; border-radius: 0 0 0 10px; }
+.b-r { bottom: 0; right: 0; border-left: none; border-top: none; border-radius: 0 0 10px 0; }
+
+.scan-line {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #a78bfa, #6366f1, #a78bfa, transparent);
+  box-shadow: 0 0 12px rgba(167, 139, 250, 0.9), 0 0 24px rgba(99, 102, 241, 0.5);
+  border-radius: 2px;
+  animation: moveLine 2.5s infinite ease-in-out;
+}
+
+@keyframes moveLine {
+  0% { top: 4px; opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { top: calc(100% - 6px); opacity: 0; }
+}
+
+.scan-hint-text {
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-align: center;
+  letter-spacing: 0.3px;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+}
+
+.scanner-bottom {
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+  padding-bottom: max(20px, env(safe-area-inset-bottom));
+}
+
+.scanner-bottom-pill {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 50px;
+  padding: 8px 20px;
+  color: white;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
 
 /* SHEET */
 .sheet-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); z-index: 2000; display: flex; align-items: flex-end; }
